@@ -136,16 +136,6 @@ class Game:
         print("Yeni sıra:", self.current_player)
         print("Yeni zarlar:", self.moves_left)
             
-    
-    
-
-    def _consume_die(self, die_value):
-     self.moves_left.remove(die_value)
-
-    def switch_turn(self):
-        self.current_player = self._get_opponent()
-        self.moves_left.clear()
-        self.roll_dice()
 
 
 
