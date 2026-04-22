@@ -96,7 +96,7 @@
         </font>
        </property>
        <property name="text">
-        <string>Status </string>
+        <string>Kapalı</string>
        </property>
       </widget>
      </item>
@@ -109,7 +109,7 @@
         </size>
        </property>
        <property name="text">
-        <string>Start Button</string>
+        <string>Server'i Başlat</string>
        </property>
       </widget>
      </item>

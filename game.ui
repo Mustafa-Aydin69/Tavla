@@ -9,7 +9,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1192</width>
+    <width>1203</width>
     <height>909</height>
    </rect>
   </property>
@@ -572,6 +572,9 @@
       <width>1101</width>
       <height>691</height>
      </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true"/>
     </property>
    </widget>
   </widget>
