@@ -245,16 +245,15 @@ class Game:
             return "black"
         return None
 # TEST
-    if __name__ == "__main__":
-        game = Game()
-        game.board.print_board()
-        game.print_status()
-        print("Geçerli hamleler:", game.get_valid_moves())
+if __name__ == "__main__":
+    game = Game()
+    game.board.print_board()
+    game.print_status()
+    print("Geçerli hamleler:", game.get_valid_moves())
+    first_move = game.get_valid_moves()[0]
+    start, end, die = first_move
 
-        first_move = game.get_valid_moves()[0]
-        start, end, die = first_move
-
-        print("Hamle sonucu:", game.move(start, die))
-        game.board.print_board()
-        game.print_status()
-        print("Yeni geçerli hamleler:", game.get_valid_moves())
+    print("Hamle sonucu:", game.move(start, die))
+    game.board.print_board()
+    game.print_status()
+    print("Yeni geçerli hamleler:", game.get_valid_moves())
