@@ -1,4 +1,5 @@
 import random
+import copy
 
 class Point:
     def __init__(self, owner=None, count=0):
@@ -81,18 +82,16 @@ class Game:
 
         end = self._calculate_end(start, die_value)
 
-        # 🔥 BAR KURALI
+        #  BAR KURALI
         if self.board.bar[self.current_player] > 0:
             if start != -1:
                 return False
 
-        # 🔥 BEAR-OFF KONTROLÜ (önce yapılmalı!)
+        #  BEAR-OFF KONTROLÜ (önce yapılmalı!)
         if (end > 23 and self.current_player == "white") or (end < 0 and self.current_player == "black"):
-            if not self._all_in_home():
-                return False
-            return True
+            return self._can_bear_off(start, die_value)
 
-        # 🔥 NORMAL MOVE KONTROLLERİ
+        #  NORMAL MOVE KONTROLLERİ
 
         # kaynak kontrolü (bar değilse)
         if start != -1:
@@ -120,26 +119,40 @@ class Game:
     
     def _handle_capture(self, dst):
         opponent = dst.owner
+
         if dst.count == 1:
+            # rakip taşı bar'a gönder
             self.board.bar[opponent] += 1
+
+            # noktayı ele geçir
             dst.owner = self.current_player
             dst.count = 1
+
+            return True
         else:
-            #raise Exception("Invalid move: cannot capture")
+            # 2+ taş varsa capture yapılamaz
             return False
 
+
     def _apply_to_destination(self, dst):
-        # Hedef noktaya taşı uygula
+        # boş nokta
         if dst.owner is None:
             dst.owner = self.current_player
             dst.count = 1
+            return True
+
+        # kendi taşı
         elif dst.owner == self.current_player:
             dst.count += 1
-        else :
-            self._handle_capture(dst)   
-            
-    def _execute_move(self, start, end):
+            return True
 
+        # rakip taşı
+        else:
+            result = self._handle_capture(dst)
+            if result is False:
+                return False
+            return True
+    def _execute_move(self, start, end):
         if end > 23 or end < 0:
             if start == -1:
                 self.board.bar[self.current_player] -= 1
@@ -158,7 +171,9 @@ class Game:
             self._remove_from_source(src)
 
         dst = self.board.points[end]
-        self._apply_to_destination(dst)
+        result = self._apply_to_destination(dst)
+        if result is False:
+            return False
       
       
     def _consume_die(self, die_value):
@@ -170,8 +185,38 @@ class Game:
             return False
 
         end = self._calculate_end(start, die_value)
-        self._execute_move(start, end)
+        result = self._execute_move(start, end)
+        if result is False:
+            return False
+        
         self._consume_die(die_value)
+        if len(set(self.moves_left)) == 2:
+            d1, d2 = list(set(self.moves_left))
+
+            d1_valid = self.has_move_for_die(d1)
+            d2_valid = self.has_move_for_die(d2)
+
+            if not d1_valid and d2_valid:
+                print(f"{d1} oynanamıyor → {d2} zorunlu")
+                self.moves_left = [d2]
+
+            elif not d2_valid and d1_valid:
+                print(f"{d2} oynanamıyor → {d1} zorunlu")
+                self.moves_left = [d1]
+        playable = self.get_playable_dice()
+
+        if len(set(self.moves_left)) == 2:
+            d1, d2 = list(set(self.moves_left))
+
+            if d1 not in playable and d2 in playable:
+                print(f"{d1} oynanamıyor → {d2} zorunlu")
+                self.moves_left = [d2]
+
+            elif d2 not in playable and d1 in playable:
+                print(f"{d2} oynanamıyor → {d1} zorunlu")
+                self.moves_left = [d1]
+            self._update_forced_die()
+        
         
         if len(self.moves_left) == 0:
              self.switch_turn()
@@ -179,6 +224,10 @@ class Game:
         if winner:
             print("Kazanan:", winner)
             return True
+        if len(self.moves_left) > 0 and not self.has_any_valid_move():
+            print("Hamle yok → tur geçiyor")
+            self.moves_left = []
+            self.switch_turn()
         return True
 
     def switch_turn(self):
@@ -186,9 +235,14 @@ class Game:
         self.moves_left = self.dice.roll()
         print("Yeni sıra:", self.current_player)
         print("Yeni zarlar:", self.moves_left)
+        playable = self.get_playable_dice()
+
+        if not playable:
+            print("Hiç hamle yok → tur geçiyor")
+            self.current_player = self._get_opponent()
+            self.moves_left = self.dice.roll()
         if not self.has_any_valid_move():
             print("Geçerli hamle yok, tur geçiyor.")
-            
             self.current_player = self._get_opponent()
             self.moves_left = self.dice.roll()
             print("Yeni sıra:", self.current_player)
@@ -238,22 +292,99 @@ class Game:
                 if p.owner == "black":
                     return False
         return True
+    
+    
     def check_winner(self):
         if self.board.bear_off["white"] == 15:
             return "white"
         if self.board.bear_off["black"] == 15:
             return "black"
         return None
-# TEST
-if __name__ == "__main__":
-    game = Game()
-    game.board.print_board()
-    game.print_status()
-    print("Geçerli hamleler:", game.get_valid_moves())
-    first_move = game.get_valid_moves()[0]
-    start, end, die = first_move
+    
+    def _can_bear_off(self, start, die_value):
+        # herkes home’da mı?
+        if not self._all_in_home():
+            return False
 
-    print("Hamle sonucu:", game.move(start, die))
-    game.board.print_board()
-    game.print_status()
-    print("Yeni geçerli hamleler:", game.get_valid_moves())
+        # bar’da taş varsa yasak
+        if self.board.bar[self.current_player] > 0:
+            return False
+
+        if self.current_player == "white":
+            distance = 24 - start
+
+            # tam zar
+            if die_value == distance:
+                return True
+
+            # büyük zar → sadece en gerideki oynar
+            if die_value > distance:
+                furthest = self._get_furthest_piece()
+                if furthest is None:
+                    return False
+                return start == furthest
+
+            return False
+
+        else:
+            distance = start + 1
+
+            if die_value == distance:
+                return True
+
+            if die_value > distance:
+                furthest = self._get_furthest_piece()
+                if furthest is None:
+                    return False
+                return start == furthest
+
+            return False  
+        
+    def has_move_for_die(self, die_value):
+        for start in range(-1, 24):
+            if self._is_valid_move(start, die_value):
+                return True
+        return False
+    
+    
+    def _update_forced_die(self):
+        if len(set(self.moves_left)) != 2:
+            return
+
+        d1, d2 = list(set(self.moves_left))
+        d1_valid = self.has_move_for_die(d1)
+        d2_valid = self.has_move_for_die(d2)
+
+        if not d1_valid and d2_valid:
+            print(f"{d1} oynanamıyor → {d2} zorunlu")
+            self.moves_left = [d2]
+
+        elif not d2_valid and d1_valid:
+            print(f"{d2} oynanamıyor → {d1} zorunlu")
+            self.moves_left = [d1]
+    def _get_furthest_piece(self):
+        if self.current_player == "white":
+            # white ileri gidiyor → en geride = en küçük index (home içinde)
+            for i in range(18, 24):
+                if self.board.points[i].owner == "white":
+                    return i
+        else:
+            # black geri gidiyor → en geride = en büyük index (home içinde)
+            for i in range(5, -1, -1):
+                if self.board.points[i].owner == "black":
+                    return i
+
+        return None
+    
+    def get_playable_dice(self):
+        playable = set()
+
+        for die in set(self.moves_left):
+            for start in range(-1, 24):
+                if self._is_valid_move(start, die):
+                    playable.add(die)
+                    break
+
+        return playable
+    def _clone(self):
+        return copy.deepcopy(self)
