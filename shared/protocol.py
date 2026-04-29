@@ -3,10 +3,8 @@ import json
 def encode(msg:dict)->bytes:
     return (json.dumps(msg) + "\n").encode("utf-8")
 
-def decode(data:bytes)->dict:
-    if isinstance(data,bytes):
-        data = data.decode("utf-8")
-    return json.loads(data.strip())
+def decode(line: str) -> dict:
+    return json.loads(line)
 
 
 #mesaj tipleri
