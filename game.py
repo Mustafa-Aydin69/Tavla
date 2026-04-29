@@ -1,390 +1,361 @@
+"""
+game.py — Tavla oyun motoru.
+
+Tüm kural mantığı burada; UI ve ağ katmanından tamamen bağımsız.
+Python 3.8+ uyumlu.
+"""
+
+from __future__ import annotations   # str | None syntax için Python 3.8/3.9'da gerekli
 import random
 import copy
 
+# ──────────────────────────────────────────────
+# Sabitler
+# ──────────────────────────────────────────────
+BOARD_SIZE   = 24
+MAX_PIECES   = 15
+WHITE_HOME   = range(18, 24)   # white'ın evi: 18-23
+BLACK_HOME   = range(0, 6)     # black'in evi: 0-5
+BAR_INDEX    = -1              # bar'ı temsil eden sanal index
+BEAR_OFF_IDX = 24              # bear-off'u temsil eden sanal index
+
+
+# ──────────────────────────────────────────────
+# Veri sınıfları
+# ──────────────────────────────────────────────
 class Point:
-    def __init__(self, owner=None, count=0):
-        self.owner = owner  # "Siyah" veya "beyaz"
-        self.count = count  # Nokta üzerindeki taş sayısı
+    """Tahta üzerindeki tek bir noktayı temsil eder."""
+
+    def __init__(self, owner: str | None = None, count: int = 0):
+        self.owner = owner   # "white" | "black" | None
+        self.count = count
+
+    def is_empty(self) -> bool:
+        return self.count == 0
+
+    def is_blot(self) -> bool:
+        """Rakip tarafından kırılabilecek tek taş."""
+        return self.count == 1
+
+    def __repr__(self):
+        return f"Point({self.owner}, {self.count})"
+
 
 class Board:
+    """24 nokta, bar ve bear-off alanlarını içeren tahta."""
+
     def __init__(self):
-        self.points = [Point() for _ in range(24)]
-        
-        self.bar = {
-            "white": 0,
-            "black": 0
-        }
+        self.points: list[Point] = [Point() for _ in range(BOARD_SIZE)]
+        self.bar:      dict[str, int] = {"white": 0, "black": 0}
+        self.bear_off: dict[str, int] = {"white": 0, "black": 0}
+        self._setup()
 
-        self.bear_off = {
-            "white": 0,
-            "black": 0
-        }
-
-        self.init_board()
-        
-    # Tahtayı başlangıç durumuna getirir
-    def init_board(self):
-        # WHITE
-        self.points[0] = Point("white", 2)
+    def _setup(self):
+        """Başlangıç taş dizilimini yerleştirir."""
+        # White taşları
+        self.points[0]  = Point("white", 2)
         self.points[11] = Point("white", 5)
         self.points[16] = Point("white", 3)
         self.points[18] = Point("white", 5)
-
-        # BLACK
+        # Black taşları
         self.points[23] = Point("black", 2)
         self.points[12] = Point("black", 5)
-        self.points[7] = Point("black", 3)
-        self.points[5] = Point("black", 5)
-        
-    def print_board(self):
-        for i, p in enumerate(self.points):
-            print(f"{i}: {p.owner} - {p.count}")
-        
-        print("BAR:", self.bar)
-        print("BEAR OFF:", self.bear_off)
+        self.points[7]  = Point("black", 3)
+        self.points[5]  = Point("black", 5)
+
+    def reset(self):
+        self.__init__()
+
+    def __repr__(self):
+        lines = [f"{i:2d}: {p}" for i, p in enumerate(self.points)]
+        lines.append(f"BAR: {self.bar}")
+        lines.append(f"BEAR-OFF: {self.bear_off}")
+        return "\n".join(lines)
+
+
 class Dice:
-    def roll(self):
+    """Zar atma mantığı."""
+
+    @staticmethod
+    def roll() -> list[int]:
         d1 = random.randint(1, 6)
         d2 = random.randint(1, 6)
+        return [d1, d1, d1, d1] if d1 == d2 else [d1, d2]
 
-        if d1 == d2:
-            return [d1, d1, d1, d1]  # duble
-        return [d1, d2]
+
+# ──────────────────────────────────────────────
+# Ana oyun sınıfı
+# ──────────────────────────────────────────────
 class Game:
-    def __init__(self):
-       self.board = Board()
-       self.dice = Dice()
-       self.current_player = "white"
-       self.moves_left = self.dice.roll()
-    
-    def print_status(self):
-       print("Sıra:", self.current_player)
-       print("Kalan zarlar:", self.moves_left)
 
-    def _get_opponent(self):
+    def __init__(self):
+        self.board          = Board()
+        self.dice           = Dice()
+        self.current_player = "white"
+        self.moves_left     = self.dice.roll()
+        self.game_over      = False
+
+    # ── Yardımcı sorgu fonksiyonları ──────────
+
+    def opponent(self) -> str:
         return "black" if self.current_player == "white" else "white"
 
-    def _calculate_end(self, start, die_value):
-        direction = 1 if self.current_player == "white" else -1
-        if start == -1:
-            return die_value - 1 if self.current_player == "white" else 24 - die_value
-    
-        return start + direction * die_value
-        
-    def _is_valid_move(self, start, die_value):
-        # zar kontrolü
-        if die_value not in self.moves_left:
-            return False
+    def direction(self) -> int:
+        """White +1 yönünde, black -1 yönünde hareket eder."""
+        return 1 if self.current_player == "white" else -1
 
-        # start kontrolü (-1 bar için özel)
-        if start != -1 and not (0 <= start <= 23):
-                return False
+    def _calc_end(self, start: int, die: int) -> int:
+        """Zar değerine göre hedef noktayı hesaplar."""
+        if start == BAR_INDEX:
+            # White bar'dan 0-5 arasına girer; black bar'dan 23-18 arasına
+            return die - 1 if self.current_player == "white" else BOARD_SIZE - die
+        return start + self.direction() * die
 
-        end = self._calculate_end(start, die_value)
-
-        #  BAR KURALI
+    def _all_in_home(self) -> bool:
+        """
+        Mevcut oyuncunun tüm taşları ev bölgesinde mi?
+        Bar'daki taş da dışarıda sayılır.
+        """
         if self.board.bar[self.current_player] > 0:
-            if start != -1:
-                return False
-
-        #  BEAR-OFF KONTROLÜ (önce yapılmalı!)
-        if (end > 23 and self.current_player == "white") or (end < 0 and self.current_player == "black"):
-            return self._can_bear_off(start, die_value)
-
-        #  NORMAL MOVE KONTROLLERİ
-
-        # kaynak kontrolü (bar değilse)
-        if start != -1:
-            src = self.board.points[start]
-            if src.owner != self.current_player or src.count == 0:
-                return False
-
-        # hedef kontrolü
-        if not (0 <= end <= 23):
-            return False  # güvenlik
-
-        dst = self.board.points[end]
-
-        # rakip 2+ taş varsa gidemez
-        if dst.owner not in (None, self.current_player) and dst.count > 1:
             return False
 
-        return True
-    
-    def _remove_from_source(self, src):
-        src.count -= 1
-        if src.count == 0:
-            src.owner = None
-    # Rakip taşı bar'a gönderme ve taşı alma işlemi 
-    
-    def _handle_capture(self, dst):
-        opponent = dst.owner
-
-        if dst.count == 1:
-            # rakip taşı bar'a gönder
-            self.board.bar[opponent] += 1
-
-            # noktayı ele geçir
-            dst.owner = self.current_player
-            dst.count = 1
-
-            return True
-        else:
-            # 2+ taş varsa capture yapılamaz
-            return False
-
-
-    def _apply_to_destination(self, dst):
-        # boş nokta
-        if dst.owner is None:
-            dst.owner = self.current_player
-            dst.count = 1
-            return True
-
-        # kendi taşı
-        elif dst.owner == self.current_player:
-            dst.count += 1
-            return True
-
-        # rakip taşı
-        else:
-            result = self._handle_capture(dst)
-            if result is False:
-                return False
-            return True
-    def _execute_move(self, start, end):
-        if end > 23 or end < 0:
-            if start == -1:
-                self.board.bar[self.current_player] -= 1
-            else:
-                src = self.board.points[start]
-                self._remove_from_source(src)
-
-            self.board.bear_off[self.current_player] += 1
-            return
-
-        # normal hareket
-        if start == -1:
-            self.board.bar[self.current_player] -= 1
-        else:
-            src = self.board.points[start]
-            self._remove_from_source(src)
-
-        dst = self.board.points[end]
-        result = self._apply_to_destination(dst)
-        if result is False:
-            return False
-      
-      
-    def _consume_die(self, die_value):
-        # Kullanılan zar değerini moves_left listesinden kaldır
-        self.moves_left.remove(die_value)
-
-    def move(self, start, die_value):
-        if not self._is_valid_move(start, die_value):
-            return False
-
-        end = self._calculate_end(start, die_value)
-        result = self._execute_move(start, end)
-        if result is False:
-            return False
-        
-        self._consume_die(die_value)
-        if len(set(self.moves_left)) == 2:
-            d1, d2 = list(set(self.moves_left))
-
-            d1_valid = self.has_move_for_die(d1)
-            d2_valid = self.has_move_for_die(d2)
-
-            if not d1_valid and d2_valid:
-                print(f"{d1} oynanamıyor → {d2} zorunlu")
-                self.moves_left = [d2]
-
-            elif not d2_valid and d1_valid:
-                print(f"{d2} oynanamıyor → {d1} zorunlu")
-                self.moves_left = [d1]
-        playable = self.get_playable_dice()
-
-        if len(set(self.moves_left)) == 2:
-            d1, d2 = list(set(self.moves_left))
-
-            if d1 not in playable and d2 in playable:
-                print(f"{d1} oynanamıyor → {d2} zorunlu")
-                self.moves_left = [d2]
-
-            elif d2 not in playable and d1 in playable:
-                print(f"{d2} oynanamıyor → {d1} zorunlu")
-                self.moves_left = [d1]
-            self._update_forced_die()
-        
-        
-        if len(self.moves_left) == 0:
-             self.switch_turn()
-        winner = self.check_winner()
-        if winner:
-            print("Kazanan:", winner)
-            return True
-        if len(self.moves_left) > 0 and not self.has_any_valid_move():
-            print("Hamle yok → tur geçiyor")
-            self.moves_left = []
-            self.switch_turn()
-        return True
-
-    def switch_turn(self):
-        self.current_player = self._get_opponent()
-        self.moves_left = self.dice.roll()
-        print("Yeni sıra:", self.current_player)
-        print("Yeni zarlar:", self.moves_left)
-        playable = self.get_playable_dice()
-
-        if not playable:
-            print("Hiç hamle yok → tur geçiyor")
-            self.current_player = self._get_opponent()
-            self.moves_left = self.dice.roll()
-        if not self.has_any_valid_move():
-            print("Geçerli hamle yok, tur geçiyor.")
-            self.current_player = self._get_opponent()
-            self.moves_left = self.dice.roll()
-            print("Yeni sıra:", self.current_player)
-            print("Yeni zarlar:", self.moves_left)    
-                    
-    def get_valid_moves(self):
-        valid_moves = []
-
-        if self.board.bar[self.current_player] > 0:
-            for die in set(self.moves_left):
-                if self._is_valid_move(-1, die):
-                    end = self._calculate_end(-1, die)
-                    valid_moves.append((-1, end, die))
-            return valid_moves
-
-        # normal durum
-        for start in range(24):
-            for die in set(self.moves_left):
-                if self._is_valid_move(start, die):
-                    end = self._calculate_end(start, die)
-                    valid_moves.append((start, end, die))
-        if len(set(self.moves_left)) == 2:  # iki farklı zar varsa
-            die1, die2 = list(set(self.moves_left))
-
-            moves_die1 = [m for m in valid_moves if m[2] == die1]
-            moves_die2 = [m for m in valid_moves if m[2] == die2]
-
-            # sadece biri oynanabiliyorsa büyük olan zorunlu
-            if not moves_die1 and moves_die2:
-                return moves_die2
-            if not moves_die2 and moves_die1:
-                return moves_die1
-        return valid_moves
-
-    def has_any_valid_move(self):
-        return len(self.get_valid_moves()) > 0
-
-    def _all_in_home(self):
         if self.current_player == "white":
+            # White evi: 18-23 → dışarıda (0-17) hiç white taşı olmamalı
             for i in range(0, 18):
-                p = self.board.points[i]
-                if p.owner == "white":
+                if self.board.points[i].owner == "white":
                     return False
         else:
-            for i in range(6, 24):
-                p = self.board.points[i]
-                if p.owner == "black":
+            # Black evi: 0-5 → dışarıda (6-23) hiç black taşı olmamalı
+            for i in range(6, BOARD_SIZE):
+                if self.board.points[i].owner == "black":
                     return False
         return True
-    
-    
-    def check_winner(self):
-        if self.board.bear_off["white"] == 15:
-            return "white"
-        if self.board.bear_off["black"] == 15:
-            return "black"
+
+    def _get_furthest_piece(self) -> int | None:
+        """
+        Bear-off için 'en gerideki' taşı döndürür.
+        White için evi en başından (18), black için evinin en sonundan (5) tarar.
+        """
+        if self.current_player == "white":
+            # White +1 yönünde hareket eder, evi 18-23.
+            # "En geride" = henüz en az mesafeyi almış = en küçük index (18'e en yakın).
+            for i in range(18, BOARD_SIZE):
+                if self.board.points[i].owner == "white":
+                    return i   # ilk bulunan = en gerideki
+        else:
+            for i in range(5, -1, -1):         # 5'ten 0'a — en uzak önce
+                if self.board.points[i].owner == "black":
+                    return i
         return None
-    
-    def _can_bear_off(self, start, die_value):
-        # herkes home’da mı?
+
+    def _can_bear_off(self, start: int, die: int) -> bool:
+        """Bear-off hareketinin geçerli olup olmadığını kontrol eder."""
         if not self._all_in_home():
             return False
 
-        # bar’da taş varsa yasak
-        if self.board.bar[self.current_player] > 0:
-            return False
-
         if self.current_player == "white":
-            distance = 24 - start
-
-            # tam zar
-            if die_value == distance:
+            distance = BOARD_SIZE - start       # 24 - start
+            if die == distance:
                 return True
+            if die > distance:
+                # Büyük zar → sadece en gerideki taş oynayabilir
+                return start == self._get_furthest_piece()
+        else:
+            distance = start + 1                # 0-tabanlı mesafe
+            if die == distance:
+                return True
+            if die > distance:
+                return start == self._get_furthest_piece()
 
-            # büyük zar → sadece en gerideki oynar
-            if die_value > distance:
-                furthest = self._get_furthest_piece()
-                if furthest is None:
-                    return False
-                return start == furthest
+        return False
 
+    # ── Hamle geçerlilik kontrolü ─────────────
+
+    def _is_valid_move(self, start: int, die: int) -> bool:
+        """(start, die) ikilisinin mevcut durumda geçerli olup olmadığını döndürür."""
+        if die not in self.moves_left:
             return False
 
+        # Not: Bar'da taş olsa bile kullanıcı istediği taşı oynayabilir.
+        # (Standart tavla kuralı dışı - kullanıcı tercihi)
+
+        # Kaynak kontrolü
+        if start == BAR_INDEX:
+            if self.board.bar[self.current_player] == 0:
+                return False
         else:
-            distance = start + 1
+            if not (0 <= start < BOARD_SIZE):
+                return False
+            src = self.board.points[start]
+            if src.owner != self.current_player or src.is_empty():
+                return False
 
-            if die_value == distance:
-                return True
+        end = self._calc_end(start, die)
 
-            if die_value > distance:
-                furthest = self._get_furthest_piece()
-                if furthest is None:
-                    return False
-                return start == furthest
+        # Bear-off durumu
+        if (self.current_player == "white" and end >= BOARD_SIZE) or \
+           (self.current_player == "black" and end < 0):
+            return self._can_bear_off(start, die)
 
-            return False  
-        
-    def has_move_for_die(self, die_value):
-        for start in range(-1, 24):
-            if self._is_valid_move(start, die_value):
+        # Normal hamle: hedef geçerli bir nokta olmalı
+        if not (0 <= end < BOARD_SIZE):
+            return False
+
+        dst = self.board.points[end]
+        # Rakibin 2+ taşı varsa gidilemez
+        if dst.owner == self.opponent() and dst.count > 1:
+            return False
+
+        return True
+
+    # ── Hamle uygulama ────────────────────────
+
+    def _remove_from_source(self, start: int):
+        """Başlangıç noktasından (veya bar'dan) bir taş kaldırır."""
+        if start == BAR_INDEX:
+            self.board.bar[self.current_player] -= 1
+        else:
+            src = self.board.points[start]
+            src.count -= 1
+            if src.count == 0:
+                src.owner = None
+
+    def _apply_to_destination(self, end: int) -> bool:
+        """
+        Hedef noktaya taş koyar; gerekirse rakibi bar'a gönderir.
+        Bear-off durumunda (end dışı) direkt bear_off sayacını artırır.
+        """
+        # Bear-off
+        if end >= BOARD_SIZE or end < 0:
+            self.board.bear_off[self.current_player] += 1
+            return True
+
+        dst = self.board.points[end]
+
+        if dst.owner is None:
+            dst.owner = self.current_player
+            dst.count = 1
+        elif dst.owner == self.current_player:
+            dst.count += 1
+        else:
+            # Rakip blot → bar'a gönder
+            if dst.count != 1:
+                return False   # 2+ taş: geçersiz (normalde buraya gelmemeli)
+            self.board.bar[dst.owner] += 1
+            dst.owner = self.current_player
+            dst.count = 1
+
+        return True
+
+    def _execute_move(self, start: int, die: int) -> bool:
+        end = self._calc_end(start, die)
+        self._remove_from_source(start)
+        return self._apply_to_destination(end)
+
+    # ── Zar yönetimi ──────────────────────────
+
+    def _consume_die(self, die: int):
+        self.moves_left.remove(die)
+
+    def _filter_moves_left(self):
+        """
+        Hiçbir zar oynanamıyorsa moves_left'i boşaltmaz (switch_turn halleder).
+        Bu fonksiyon artık sadece oynanamamış zarları temizlemek için değil,
+        has_any_valid_move kontrolü için kullanılır.
+        """
+        pass   # Büyük zar zorunluluğu kaldırıldı — kullanıcı istediği zarla oynar
+
+    def _has_move_for_die(self, die: int) -> bool:
+        """Verilen zar değeri için en az bir geçerli hamle var mı?"""
+        sources = [BAR_INDEX] if self.board.bar[self.current_player] > 0 \
+                  else range(BOARD_SIZE)
+        for s in sources:
+            if self._is_valid_move(s, die):
                 return True
         return False
-    
-    
-    def _update_forced_die(self):
-        if len(set(self.moves_left)) != 2:
-            return
 
-        d1, d2 = list(set(self.moves_left))
-        d1_valid = self.has_move_for_die(d1)
-        d2_valid = self.has_move_for_die(d2)
+    # ── Genel sorgular ────────────────────────
 
-        if not d1_valid and d2_valid:
-            print(f"{d1} oynanamıyor → {d2} zorunlu")
-            self.moves_left = [d2]
+    def get_valid_moves(self) -> list[tuple[int, int, int]]:
+            """
+            Mevcut durum için tüm (start, end, die) üçlülerini döndürür.
+            Barda taş olsa bile kullanıcının diğer taşlarla oynamasına izin verir.
+            """
+            moves: list[tuple[int, int, int]] = []
 
-        elif not d2_valid and d1_valid:
-            print(f"{d2} oynanamıyor → {d1} zorunlu")
-            self.moves_left = [d1]
-    def _get_furthest_piece(self):
-        if self.current_player == "white":
-            # white ileri gidiyor → en geride = en küçük index (home içinde)
-            for i in range(18, 24):
-                if self.board.points[i].owner == "white":
-                    return i
-        else:
-            # black geri gidiyor → en geride = en büyük index (home içinde)
-            for i in range(5, -1, -1):
-                if self.board.points[i].owner == "black":
-                    return i
+            # 1. Bar'daki taşlar için hamleleri kontrol et
+            if self.board.bar[self.current_player] > 0:
+                for die in set(self.moves_left):
+                    if self._is_valid_move(BAR_INDEX, die):
+                        end = self._calc_end(BAR_INDEX, die)
+                        moves.append((BAR_INDEX, end, die))
 
+            # 2. Tahtadaki (0-23 arası) tüm taşlar için hamleleri kontrol et
+            for start in range(BOARD_SIZE):
+                for die in set(self.moves_left):
+                    if self._is_valid_move(start, die):
+                        end = self._calc_end(start, die)
+                        moves.append((start, end, die))
+
+            return moves
+    def has_any_valid_move(self) -> bool:
+        return bool(self.get_valid_moves())
+
+    def check_winner(self) -> str | None:
+        if self.board.bear_off["white"] == MAX_PIECES:
+            return "white"
+        if self.board.bear_off["black"] == MAX_PIECES:
+            return "black"
         return None
-    
-    def get_playable_dice(self):
-        playable = set()
 
-        for die in set(self.moves_left):
-            for start in range(-1, 24):
-                if self._is_valid_move(start, die):
-                    playable.add(die)
-                    break
+    # ── Ana hamle fonksiyonu ──────────────────
 
-        return playable
-    def _clone(self):
+    def move(self, start: int, die: int) -> bool:
+        """
+        (start, die) hamlesini uygular.
+        Başarılıysa True, geçersizse False döndürür.
+        Tüm zarlar bitince veya hamle kalmayınca sırayı değiştirir.
+        """
+        if self.game_over:
+            return False
+
+        if not self._is_valid_move(start, die):
+            return False
+
+        self._execute_move(start, die)
+        self._consume_die(die)
+
+        # Kazanan kontrolü
+        winner = self.check_winner()
+        if winner:
+            self.game_over = True
+            return True
+
+        # Kalan zarlar için filtre uygula
+        if self.moves_left:
+            self._filter_moves_left()
+
+        # Zarlar bitti ya da hiç hamle kalmadı → sıra değiştir
+        if not self.moves_left or not self.has_any_valid_move():
+            self.switch_turn()
+
+        return True
+
+    def switch_turn(self):
+        """Sırayı rakibe geçirir ve yeni zar atar."""
+        self.current_player = self.opponent()
+        self.moves_left     = self.dice.roll()
+
+        # Yeni oyuncunun da hamlesi yoksa tekrar geç
+        self._filter_moves_left()
+        if not self.has_any_valid_move():
+            self.current_player = self.opponent()
+            self.moves_left     = self.dice.roll()
+
+    def reset(self):
+        """Oyunu sıfırlar."""
+        self.__init__()
+
+    def clone(self) -> "Game":
+        """Oyunun derin kopyasını döndürür (AI veya test için)."""
         return copy.deepcopy(self)
