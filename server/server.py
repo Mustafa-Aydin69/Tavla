@@ -15,9 +15,9 @@ class ClientContext:
         self.opponent = None
         self.game = None
 
-# Bağlanan oyuncuların atıldığı global liste
+# Bağlanan oyuncuların atıldığı global liste ve lock
 waiting_players = []
-
+waiting_lock = threading.Lock()
 
 def handle_client(client: ClientContext):
     buffer = ""
@@ -39,11 +39,6 @@ def handle_client(client: ClientContext):
 
             except Exception as e:
                 print(f"Error receiving data from {client.addr}: {e}")
-                break
-
-            if not data:
-                # Eğer recv() boş dönerse client bağlantıyı normal şekilde kapatmış
-                normal_disconnect = True
                 break
 
             buffer += data
@@ -71,6 +66,21 @@ def handle_client(client: ClientContext):
             print(f"Client disconnected normally: {client.addr}")
         else:
             print(f"Client disconnected with error/abruptly: {client.addr}")
+
+        # Eğer eşleşmiş bir rakip varsa ona bağlantının koptuğunu bildir
+        if client.opponent and client.opponent.conn:
+            try:
+                client.opponent.conn.sendall(
+                    encode({"type": "OPPONENT_DISCONNECTED"})
+                )
+                client.opponent.opponent = None
+            except:
+                pass
+
+        # Queue'da kalmış ölü client'ı temizle
+        with waiting_lock:
+            if client in waiting_players:
+                waiting_players.remove(client)
 
         client.conn.close()
 
@@ -102,33 +112,31 @@ def start_server():
             # Client'ı obje haline getir
             client = ClientContext(client_socket, client_address)
 
-            # Bağlanan client'ı sıraya ekle
-            waiting_players.append(client)
-
-            # WAITING mesajı gönder
-            client.conn.sendall(encode({"type": "WAITING"}))
-
-            # 2 oyuncu olunca eşleştir
-            if len(waiting_players) >= 2:
-                p1 = waiting_players.pop(0)
-                p2 = waiting_players.pop(0)
-
-                # Rakipleri birbirine bağla (Çok Kritik!)
-                p1.opponent = p2
-                p2.opponent = p1
-
-                # MATCH mesajlarını gönder
-                p1.conn.sendall(encode({"type": "MATCH", "color": "WHITE"}))
-                p2.conn.sendall(encode({"type": "MATCH", "color": "BLACK"}))
-
-                print(f"Match found: {p1.addr} vs {p2.addr}")
-
-            # Ayrı bir thread başlat ve client ile iletişimi oraya devret
+            # Ayrı bir thread başlat ve client ile iletişimi anında oraya devret
             # daemon=True sayesinde ana program kapanınca thread'ler de arkada asılı kalmaz, kapanır.
-            # İşletim sistemi projesinde yaptığımız aynı işlem
             threading.Thread(
                 target=handle_client, args=(client,), daemon=True
             ).start()
+
+            # Thread-safe şekilde sıraya ekle ve eşleştir
+            with waiting_lock:
+                waiting_players.append(client)
+                client.conn.sendall(encode({"type": "WAITING"}))
+
+                # 2 oyuncu olunca eşleştir
+                if len(waiting_players) >= 2:
+                    p1 = waiting_players.pop(0)
+                    p2 = waiting_players.pop(0)
+
+                    # Rakipleri birbirine bağla (Çok Kritik!)
+                    p1.opponent = p2
+                    p2.opponent = p1
+
+                    # MATCH mesajlarını gönder
+                    p1.conn.sendall(encode({"type": "MATCH", "color": "WHITE"}))
+                    p2.conn.sendall(encode({"type": "MATCH", "color": "BLACK"}))
+
+                    print(f"[MATCH] {p1.addr} vs {p2.addr}")
 
     except KeyboardInterrupt:
         print("\nServer shutting down.")
