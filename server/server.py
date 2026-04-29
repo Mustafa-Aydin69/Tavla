@@ -6,7 +6,10 @@ import json
 
 # shared.protocol importu için gerekli
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from shared.protocol import decode
+from shared.protocol import decode, encode
+
+# Bağlanan oyuncuların atıldığı global liste
+waiting_players = []
 
 
 def handle_client(conn, addr):
@@ -89,8 +92,26 @@ def start_server():
 
             print(f"New connection: {client_address}")
 
+            # Bağlanan client'ı sıraya ekle
+            waiting_players.append((client_socket, client_address))
+
+            # WAITING mesajı gönder
+            client_socket.sendall(encode({"type": "WAITING"}))
+
+            # 2 oyuncu olunca eşleştir
+            if len(waiting_players) >= 2:
+                p1_sock, p1_addr = waiting_players.pop(0)
+                p2_sock, p2_addr = waiting_players.pop(0)
+
+                # MATCH mesajlarını gönder
+                p1_sock.sendall(encode({"type": "MATCH", "color": "WHITE"}))
+                p2_sock.sendall(encode({"type": "MATCH", "color": "BLACK"}))
+
+                print(f"Match found: {p1_addr} vs {p2_addr}")
+
             # Ayrı bir thread başlat ve client ile iletişimi oraya devret
             # daemon=True sayesinde ana program kapanınca thread'ler de arkada asılı kalmaz, kapanır.
+            # İşletim sistemi projesinde yaptığımız aynı işlem
             threading.Thread(
                 target=handle_client, args=(client_socket, client_address), daemon=True
             ).start()
