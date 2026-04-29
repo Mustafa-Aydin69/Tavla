@@ -8,11 +8,18 @@ import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import decode, encode
 
+class ClientContext:
+    def __init__(self, conn, addr):
+        self.conn = conn
+        self.addr = addr
+        self.opponent = None
+        self.game = None
+
 # Bağlanan oyuncuların atıldığı global liste
 waiting_players = []
 
 
-def handle_client(conn, addr):
+def handle_client(client: ClientContext):
     buffer = ""
     normal_disconnect = False
 
@@ -20,18 +27,18 @@ def handle_client(conn, addr):
         while True:
             try:
                 # Gelen veriyi okuma ve decode etme. Hata olursa server çökmesin.
-                raw = conn.recv(1024)
+                raw = client.conn.recv(1024)
                 if not raw:
                     normal_disconnect = True
                     break
                 try:
                     data = raw.decode("utf-8")
                 except UnicodeDecodeError as e:
-                    print(f"Decode error from {addr}: {e}")
+                    print(f"Decode error from {client.addr}: {e}")
                     continue
 
             except Exception as e:
-                print(f"Error receiving data from {addr}: {e}")
+                print(f"Error receiving data from {client.addr}: {e}")
                 break
 
             if not data:
@@ -49,23 +56,23 @@ def handle_client(conn, addr):
                 if line.strip():
                     try:
                         msg = decode(line)
-                        print(f"Received from {addr}: {msg}")
+                        print(f"Received from {client.addr}: {msg}")
                     except json.JSONDecodeError as e:
-                        print(f"Invalid JSON from {addr}: {e} (Line: {line})")
+                        print(f"Invalid JSON from {client.addr}: {e} (Line: {line})")
                     except Exception as e:
-                        print(f"Decode error from {addr}: {e}")
+                        print(f"Decode error from {client.addr}: {e}")
 
     except Exception as e:
         # Beklenmedik bir şekilde bağlantı koparsa buraya düşer
-        print(f"Error with {addr}: {e}")
+        print(f"Error with {client.addr}: {e}")
     finally:
         # Bağlantı koptuğunda durumu belirterek çalışır
         if normal_disconnect:
-            print(f"Client disconnected normally: {addr}")
+            print(f"Client disconnected normally: {client.addr}")
         else:
-            print(f"Client disconnected with error/abruptly: {addr}")
+            print(f"Client disconnected with error/abruptly: {client.addr}")
 
-        conn.close()
+        client.conn.close()
 
 
 def start_server():
@@ -92,28 +99,35 @@ def start_server():
 
             print(f"New connection: {client_address}")
 
+            # Client'ı obje haline getir
+            client = ClientContext(client_socket, client_address)
+
             # Bağlanan client'ı sıraya ekle
-            waiting_players.append((client_socket, client_address))
+            waiting_players.append(client)
 
             # WAITING mesajı gönder
-            client_socket.sendall(encode({"type": "WAITING"}))
+            client.conn.sendall(encode({"type": "WAITING"}))
 
             # 2 oyuncu olunca eşleştir
             if len(waiting_players) >= 2:
-                p1_sock, p1_addr = waiting_players.pop(0)
-                p2_sock, p2_addr = waiting_players.pop(0)
+                p1 = waiting_players.pop(0)
+                p2 = waiting_players.pop(0)
+
+                # Rakipleri birbirine bağla (Çok Kritik!)
+                p1.opponent = p2
+                p2.opponent = p1
 
                 # MATCH mesajlarını gönder
-                p1_sock.sendall(encode({"type": "MATCH", "color": "WHITE"}))
-                p2_sock.sendall(encode({"type": "MATCH", "color": "BLACK"}))
+                p1.conn.sendall(encode({"type": "MATCH", "color": "WHITE"}))
+                p2.conn.sendall(encode({"type": "MATCH", "color": "BLACK"}))
 
-                print(f"Match found: {p1_addr} vs {p2_addr}")
+                print(f"Match found: {p1.addr} vs {p2.addr}")
 
             # Ayrı bir thread başlat ve client ile iletişimi oraya devret
             # daemon=True sayesinde ana program kapanınca thread'ler de arkada asılı kalmaz, kapanır.
             # İşletim sistemi projesinde yaptığımız aynı işlem
             threading.Thread(
-                target=handle_client, args=(client_socket, client_address), daemon=True
+                target=handle_client, args=(client,), daemon=True
             ).start()
 
     except KeyboardInterrupt:
