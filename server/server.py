@@ -2,51 +2,83 @@ import socket
 import threading
 import sys
 import os
+import json
 
 # shared.protocol importu için gerekli
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import decode
+
 
 def handle_client(conn, addr):
     buffer = ""
+    normal_disconnect = False
+
     try:
         while True:
-            data = conn.recv(1024).decode("utf-8")
+            try:
+                # Gelen veriyi okuma ve decode etme. Hata olursa server çökmesin.
+                raw = conn.recv(1024)
+                if not raw:
+                    normal_disconnect = True
+                    break
+                try:
+                    data = raw.decode("utf-8")
+                except UnicodeDecodeError as e:
+                    print(f"Decode error from {addr}: {e}")
+                    continue
+
+            except Exception as e:
+                print(f"Error receiving data from {addr}: {e}")
+                break
+
             if not data:
                 # Eğer recv() boş dönerse client bağlantıyı normal şekilde kapatmış
+                normal_disconnect = True
                 break
-                
+
             buffer += data
-            
+
             # Mesajları newline (\n) karakterine göre ayırıyoruz
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
-                
+
                 # Boş satırları atlama
                 if line.strip():
-                    msg = decode(line)
-                    print(f"Received from {addr}: {msg}")
-                    
+                    try:
+                        msg = decode(line)
+                        print(f"Received from {addr}: {msg}")
+                    except json.JSONDecodeError as e:
+                        print(f"Invalid JSON from {addr}: {e} (Line: {line})")
+                    except Exception as e:
+                        print(f"Decode error from {addr}: {e}")
+
     except Exception as e:
         # Beklenmedik bir şekilde bağlantı koparsa buraya düşer
-        pass
+        print(f"Error with {addr}: {e}")
     finally:
-        #bağlantı koptuğunda çalışır
-        print(f"Client disconnected: {addr}")
+        # Bağlantı koptuğunda durumu belirterek çalışır
+        if normal_disconnect:
+            print(f"Client disconnected normally: {addr}")
+        else:
+            print(f"Client disconnected with error/abruptly: {addr}")
+
         conn.close()
+
 
 def start_server():
     HOST = "0.0.0.0"
     PORT = 5000
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
-    #Serveri aç kapa yaptığımız zaman 5000 portu dolu gözükmesin diye "Address already in use"
-    #hatasını almamak için bu satırı ekledim.(Nurettin'e Not)
+
+    # Serveri aç kapa yaptığımız zaman 5000 portu dolu gözükmesin diye "Address already in use"
+    # hatasını almamak için bu satırı ekledim.(Nurettin'e Not)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    
+
     server_socket.bind((HOST, PORT))
-    server_socket.listen()
+
+    # Listen backlog eklenmesi (Aynı anda bekleyen bağlantı sırası)
+    server_socket.listen(5)
 
     print(f"Server listening on {HOST}:{PORT}...")
 
@@ -54,17 +86,20 @@ def start_server():
         while True:
             # Bağlantı bekle ve kabul et
             client_socket, client_address = server_socket.accept()
-            
+
             print(f"New connection: {client_address}")
-            
+
             # Ayrı bir thread başlat ve client ile iletişimi oraya devret
             # daemon=True sayesinde ana program kapanınca thread'ler de arkada asılı kalmaz, kapanır.
-            threading.Thread(target=handle_client, args=(client_socket, client_address), daemon=True).start()
-            
+            threading.Thread(
+                target=handle_client, args=(client_socket, client_address), daemon=True
+            ).start()
+
     except KeyboardInterrupt:
         print("\nServer shutting down.")
     finally:
         server_socket.close()
+
 
 if __name__ == "__main__":
     start_server()
