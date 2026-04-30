@@ -3,49 +3,52 @@ import threading
 import sys
 import os
 
-# shared.protocol importu için gerekli
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import encode, decode
 
 HOST = "127.0.0.1"
 PORT = 5000
 
+ROLL = "ROLL"
+MOVE = "MOVE"
+
 running = True
 sock = None
 game_over_msg = None
 
 
+def log(msg):
+    print(msg)
+
+
 def connect_to_server():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
-    print("Sunucuya bağlanıldı.")
+    log("Sunucuya bağlanıldı.")
     return s
 
 
 def send_message(msg):
     global sock
-
     try:
         sock.sendall(encode(msg))
     except Exception as e:
-        print("Mesaj gönderilemedi:", e)
+        log(f"[HATA] Mesaj gönderilemedi: {e}")
 
 
 def handle_game_over(msg):
-    print("\n=== OYUN BİTTİ ===")
-    print("Kazanan:", msg.get("winner"))
+    log("\n=== OYUN BİTTİ ===")
+    log(f"Kazanan: {msg.get('winner')}")
     if "reason" in msg:
-        print("Sebep:", msg.get("reason"))
+        log(f"Sebep: {msg.get('reason')}")
 
     while True:
         secim = input("Tekrar oynamak ister misiniz? (y/n): ").lower()
-
         if secim == "y":
             return "RECONNECT"
         elif secim == "n":
             return "EXIT"
-        else:
-            print("Lütfen y veya n girin.")
+        log("Lütfen y veya n girin.")
 
 
 def listen():
@@ -57,7 +60,7 @@ def listen():
             data = sock.recv(1024)
 
             if not data:
-                print("\n[BAĞLANTI KESİLDİ] Sunucu bağlantıyı kapattı.")
+                log("\n[BAĞLANTI KESİLDİ]")
                 running = False
                 return "DISCONNECTED"
 
@@ -77,18 +80,18 @@ def listen():
                     msg_type = msg.get("type")
 
                     if msg_type == "WAITING":
-                        print("\n[BEKLEME] Rakip bekleniyor...")
+                        log("\n[BEKLEME] Rakip bekleniyor...")
 
                     elif msg_type == "MATCH":
-                        print(f"\n[EŞLEŞME] Oyuna girdiniz! Renk: {msg.get('color')}")
+                        log(f"\n[EŞLEŞME] Renk: {msg.get('color')}")
 
                     elif msg_type == "STATE":
-                        print("\n[OYUN DURUMU]")
-                        print(f"Sıra: {msg.get('turn')}")
-                        print(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
+                        log("\n[OYUN DURUMU]")
+                        log(f"Sıra: {msg.get('turn')}")
+                        log(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
 
                     elif msg_type == "REJECT":
-                        print(f"\n[HATA] {msg.get('reason')}")
+                        log(f"\n[HATA] {msg.get('reason')}")
 
                     elif msg_type == "GAME_OVER":
                         game_over_msg = msg
@@ -96,19 +99,14 @@ def listen():
                         return "GAME_OVER"
 
                     else:
-                        print("\n[SERVER]", msg)
+                        log(f"\n[SERVER] {msg}")
 
                 except Exception:
-                    print("Geçersiz JSON:", line)
-
-        except ConnectionResetError:
-            print("\n[HATA] Sunucu bağlantıyı zorla kapattı.")
-            running = False
-            return "DISCONNECTED"
+                    log(f"Geçersiz JSON: {line}")
 
         except Exception as e:
             if running:
-                print("\n[HATA] Bağlantı hatası:", e)
+                log(f"\n[HATA] {e}")
             running = False
             return "DISCONNECTED"
 
@@ -117,49 +115,40 @@ def listen():
 
 def handle_command(cmd):
     parts = cmd.split()
-
     if not parts:
         return
 
     if parts[0] == "roll":
-        send_message({"type": "ROLL"})
+        send_message({"type": ROLL})
         return
 
     if parts[0] == "move":
         if len(parts) != 3:
-            print("Kullanım: move <start> <die>")
+            log("Kullanım: move <start> <die>")
             return
 
         try:
             start = int(parts[1])
             die = int(parts[2])
 
-            if start < 0:
-                print("Geçersiz start değeri.")
+            if start < 0 or die <= 0:
+                log("Geçersiz değerler.")
                 return
 
-            if die <= 0:
-                print("Geçersiz zar değeri.")
-                return
-
-            send_message({"type": "MOVE", "moves": [(start, die)]})
+            send_message({"type": MOVE, "moves": [(start, die)]})
 
         except ValueError:
-            print("start ve die sayı olmalıdır.")
+            log("start ve die sayı olmalıdır.")
         return
 
     if parts[0] in ("help", "?"):
-        print("\nKomutlar:")
-        print("  roll")
-        print("  move <start> <die>")
-        print("  help")
-        print("  quit")
+        log("\nKomutlar: roll, move <start> <die>, quit")
         return
 
     if parts[0] == "quit":
         raise KeyboardInterrupt
 
-    print("Bilinmeyen komut. Yardım için: help")
+    log("Bilinmeyen komut.")
 
 
 def start_client():
@@ -168,10 +157,11 @@ def start_client():
     while True:
         running = True
         game_over_msg = None
+
         try:
             sock = connect_to_server()
         except Exception as e:
-            print(f"Failed to connect: {e}")
+            log(f"Bağlantı hatası: {e}")
             break
 
         action = None
@@ -179,44 +169,33 @@ def start_client():
         def run_listener():
             nonlocal action
             action = listen()
-            global running
-            running = False
 
         t = threading.Thread(target=run_listener, daemon=True)
         t.start()
 
         while running:
             try:
-                # Kullanıcı >>> da beklerken mesaj gelip oyun biterse
-                # bu input'a bir şey girip Enter'a basana kadar burada asılı kalır.
-                # Enter'a basınca running=False olduğunu anlayıp döngüden çıkacak.
-                cmd = input(">>> ")
+                cmd = input(">>> ").strip()
 
                 if not running:
                     break
 
-                if cmd == "roll":
-                    sock.sendall(encode({"type": "ROLL"}))
+                if not cmd:
+                    continue
 
-                elif cmd.startswith("move"):
-                    try:
-                        _, start, die = cmd.split()
-                        sock.sendall(
-                            encode({"type": "MOVE", "moves": [(int(start), int(die))]})
-                        )
-                    except ValueError:
-                        print("Usage: move <start> <die>")
+                handle_command(cmd)
 
             except KeyboardInterrupt:
-                print("\nExiting...")
+                log("\nÇıkılıyor...")
                 running = False
                 break
             except Exception as e:
-                print("Error:", e)
+                log(f"Hata: {e}")
+                running = False
                 break
 
-        # Thread ve socket temizliği
         running = False
+
         try:
             sock.close()
         except:
@@ -228,14 +207,25 @@ def start_client():
             action = handle_game_over(game_over_msg)
             game_over_msg = None
 
+        if action == "DISCONNECTED":
+            log("\nBağlantı koptu. Tekrar bağlanılsın mı? (y/n)")
+            while True:
+                secim = input("> ").lower()
+                if secim == "y":
+                    action = "RECONNECT"
+                    break
+                elif secim == "n":
+                    action = "EXIT"
+                    break
+
         if action is None:
             action = "EXIT"
 
         if action == "RECONNECT":
-            print("Reconnecting...\n")
+            log("\nYeniden bağlanılıyor...\n")
             continue
         else:
-            print("Goodbye.")
+            log("Program sonlandırıldı.")
             break
 
 
