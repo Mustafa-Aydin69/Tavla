@@ -72,12 +72,30 @@ def listen():
 
                 try:
                     msg = decode(line)
-                    print("SERVER:", msg)
 
-                    if msg.get("type") == "GAME_OVER":
+                    msg_type = msg.get("type")
+
+                    if msg_type == "WAITING":
+                        print("\n[BEKLEME] Rakip bekleniyor...")
+
+                    elif msg_type == "MATCH":
+                        print(f"\n[EŞLEŞME] Oyuna girdiniz! Renk: {msg.get('color')}")
+
+                    elif msg_type == "STATE":
+                        print("\n[OYUN DURUMU]")
+                        print(f"Sıra: {msg.get('turn')}")
+                        print(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
+
+                    elif msg_type == "REJECT":
+                        print(f"\n[HATA] {msg.get('reason')}")
+
+                    elif msg_type == "GAME_OVER":
                         game_over_msg = msg
                         running = False
                         return "GAME_OVER"
+
+                    else:
+                        print("\n[SERVER]", msg)
 
                 except Exception:
                     print("Geçersiz JSON:", line)
