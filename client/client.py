@@ -1,5 +1,5 @@
 import socket
-
+import threading
 
 from shared.protocol import encode, decode
 
@@ -7,9 +7,25 @@ HOST = "127.0.0.1"
 PORT = 5000
 
 
+def listen(sock):
+    while True:
+        try:
+            data = sock.recv(1024)
+            if not data:
+                print("Bağlantı kesildi.")
+                break
+
+            print("SERVER:", data.decode())
+
+        except Exception as e:
+            print("Dinleme hatası:", e)
+            break
+
+
 def start_client():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((HOST, PORT))
+    threading.Thread(target=listen, args=(sock,), daemon=True).start()
     print("Connected to server")
     while True:
         cmd = input(">>> ")
@@ -24,14 +40,7 @@ def start_client():
                     encode({"type": "MOVE", "moves": [(int(start), int(die))]})
                 )
             except ValueError:
-                print("Usage: move <start> <die>")
-
-        data = sock.recv(1024)
-        if not data:
-            print("Disconnected.")
-            break
-
-        print("SERVER:", data.decode())
+                print("Kullanım: move <start> <die>")
 
 
 if __name__ == "__main__":
