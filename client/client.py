@@ -76,7 +76,16 @@ def handle_game_over(msg):
         log(f"Sebep: {msg.get('reason')}")
 
     while True:
-        secim = input("Tekrar oynamak ister misiniz? (y/n): ").lower()
+        print("Tekrar oynamak ister misiniz? (y/n): ", end="", flush=True)
+        
+        # input() kullanmak yerine arkaplan thread'inin topladığı kuyruktan oku
+        secim = ""
+        while True:
+            try:
+                secim = input_queue.get(timeout=0.2).strip().lower()
+                break
+            except queue.Empty:
+                continue
 
         if secim == "y":
             return "RECONNECT"
