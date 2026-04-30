@@ -199,9 +199,14 @@ def handle_client(client: ClientContext):
         # Oyundan kopan varsa GameSession temizliği ve oyunu bitirme
         if client.game:
             session = client.game
+            winner = client.opponent.color if client.opponent else None
             for p in session.players:
                 send_safe(
-                    p.conn, {"type": "GAME_OVER", "reason": "Opponent disconnected"}
+                    p.conn,
+                    {
+                        "type": "GAME_OVER",
+                        "winner": winner,
+                    },
                 )
                 p.game = None
                 p.opponent = None
