@@ -28,7 +28,11 @@ def listen(sock):
                 if not line.strip():
                     continue
 
-                print("SERVER:", line)
+                try:
+                    msg = decode(line)
+                    print("SERVER:", msg)
+                except Exception as e:
+                    print("Geçersiz JSON:", line)
 
         except Exception as e:
             print("Dinleme hatası:", e)
