@@ -1,26 +1,22 @@
 import random
 
+
 class Point:
     def __init__(self, owner=None, count=0):
         self.owner = owner  # "Siyah" veya "beyaz"
         self.count = count  # Nokta üzerindeki taş sayısı
 
+
 class Board:
     def __init__(self):
         self.points = [Point() for _ in range(24)]
-        
-        self.bar = {
-            "white": 0,
-            "black": 0
-        }
 
-        self.bear_off = {
-            "white": 0,
-            "black": 0
-        }
+        self.bar = {"white": 0, "black": 0}
+
+        self.bear_off = {"white": 0, "black": 0}
 
         self.init_board()
-        
+
     # Tahtayı başlangıç durumuna getirir
     def init_board(self):
         # WHITE
@@ -34,13 +30,15 @@ class Board:
         self.points[12] = Point("black", 5)
         self.points[7] = Point("black", 3)
         self.points[5] = Point("black", 5)
-        
+
     def print_board(self):
         for i, p in enumerate(self.points):
             print(f"{i}: {p.owner} - {p.count}")
-        
+
         print("BAR:", self.bar)
         print("BEAR OFF:", self.bear_off)
+
+
 class Dice:
     def roll(self):
         d1 = random.randint(1, 6)
@@ -49,16 +47,18 @@ class Dice:
         if d1 == d2:
             return [d1, d1, d1, d1]  # duble
         return [d1, d2]
+
+
 class Game:
     def __init__(self):
-       self.board = Board()
-       self.dice = Dice()
-       self.current_player = "white"
-       self.moves_left = self.dice.roll()
-    
+        self.board = Board()
+        self.dice = Dice()
+        self.current_player = "white"
+        self.moves_left = self.dice.roll()
+
     def print_status(self):
-       print("Sıra:", self.current_player)
-       print("Kalan zarlar:", self.moves_left)
+        print("Sıra:", self.current_player)
+        print("Kalan zarlar:", self.moves_left)
 
     def _get_opponent(self):
         return "black" if self.current_player == "white" else "white"
@@ -67,9 +67,9 @@ class Game:
         direction = 1 if self.current_player == "white" else -1
         if start == -1:
             return die_value - 1 if self.current_player == "white" else 24 - die_value
-    
+
         return start + direction * die_value
-        
+
     def _is_valid_move(self, start, die_value):
         # zar kontrolü
         if die_value not in self.moves_left:
@@ -77,22 +77,24 @@ class Game:
 
         # start kontrolü (-1 bar için özel)
         if start != -1 and not (0 <= start <= 23):
-                return False
+            return False
 
         end = self._calculate_end(start, die_value)
 
-        # 🔥 BAR KURALI
+        # BAR KURALI
         if self.board.bar[self.current_player] > 0:
             if start != -1:
                 return False
 
-        # 🔥 BEAR-OFF KONTROLÜ (önce yapılmalı!)
-        if (end > 23 and self.current_player == "white") or (end < 0 and self.current_player == "black"):
+        #  BEAR-OFF KONTROLÜ (önce yapılmalı!)
+        if (end > 23 and self.current_player == "white") or (
+            end < 0 and self.current_player == "black"
+        ):
             if not self._all_in_home():
                 return False
             return True
 
-        # 🔥 NORMAL MOVE KONTROLLERİ
+        #  NORMAL MOVE KONTROLLERİ
 
         # kaynak kontrolü (bar değilse)
         if start != -1:
@@ -111,13 +113,14 @@ class Game:
             return False
 
         return True
-    
+
     def _remove_from_source(self, src):
         src.count -= 1
         if src.count == 0:
             src.owner = None
-    # Rakip taşı bar'a gönderme ve taşı alma işlemi 
-    
+
+    # Rakip taşı bar'a gönderme ve taşı alma işlemi
+
     def _handle_capture(self, dst):
         opponent = dst.owner
         if dst.count == 1:
@@ -125,7 +128,7 @@ class Game:
             dst.owner = self.current_player
             dst.count = 1
         else:
-            #raise Exception("Invalid move: cannot capture")
+            # raise Exception("Invalid move: cannot capture")
             return False
 
     def _apply_to_destination(self, dst):
@@ -135,9 +138,9 @@ class Game:
             dst.count = 1
         elif dst.owner == self.current_player:
             dst.count += 1
-        else :
-            self._handle_capture(dst)   
-            
+        else:
+            self._handle_capture(dst)
+
     def _execute_move(self, start, end):
 
         if end > 23 or end < 0:
@@ -159,8 +162,7 @@ class Game:
 
         dst = self.board.points[end]
         self._apply_to_destination(dst)
-      
-      
+
     def _consume_die(self, die_value):
         # Kullanılan zar değerini moves_left listesinden kaldır
         self.moves_left.remove(die_value)
@@ -172,9 +174,9 @@ class Game:
         end = self._calculate_end(start, die_value)
         self._execute_move(start, end)
         self._consume_die(die_value)
-        
+
         if len(self.moves_left) == 0:
-             self.switch_turn()
+            self.switch_turn()
         winner = self.check_winner()
         if winner:
             print("Kazanan:", winner)
@@ -188,12 +190,12 @@ class Game:
         print("Yeni zarlar:", self.moves_left)
         if not self.has_any_valid_move():
             print("Geçerli hamle yok, tur geçiyor.")
-            
+
             self.current_player = self._get_opponent()
             self.moves_left = self.dice.roll()
             print("Yeni sıra:", self.current_player)
-            print("Yeni zarlar:", self.moves_left)    
-                    
+            print("Yeni zarlar:", self.moves_left)
+
     def get_valid_moves(self):
         valid_moves = []
 
@@ -238,12 +240,39 @@ class Game:
                 if p.owner == "black":
                     return False
         return True
+
     def check_winner(self):
         if self.board.bear_off["white"] == 15:
             return "white"
         if self.board.bear_off["black"] == 15:
             return "black"
         return None
+
+    def is_game_over(self):
+        return self.check_winner() is not None
+
+    def get_winner(self):
+        return self.check_winner()
+
+    # Öncesinde Referansını gönderiyormuşuz bu yüzden server tarafında bir değişiklikte sorun oluyordu.
+    def get_state(self):
+        return {
+            "points": [{"owner": p.owner, "count": p.count} for p in self.board.points],
+            "bar": dict(self.board.bar),
+            "bear_off": dict(self.board.bear_off),
+            "current_player": self.current_player,
+            "moves_left": list(self.moves_left),
+            "valid_moves": self.get_valid_moves(),
+            "winner": self.check_winner(),
+        }
+
+    def apply_move_sequence(self, moves):
+        for start, die in moves:
+            if not self.move(start, die):
+                return False
+        return True
+
+
 # TEST
 if __name__ == "__main__":
     game = Game()
