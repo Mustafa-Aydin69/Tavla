@@ -248,7 +248,7 @@ class Game:
             return "black"
         return None
 
-    def game_state(self):
+    def get_state(self):
         return {
             "points": [{"owner": p.owner, "count": p.count} for p in self.board.points],
             "bar": self.board.bar,
