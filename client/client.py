@@ -31,6 +31,11 @@ def listen(sock):
                 try:
                     msg = decode(line)
                     print("SERVER:", msg)
+                    if msg.get("type") == "GAME_OVER":
+                        print("\n=== OYUN BİTTİ ===")
+                        print("Kazanan:", msg.get("winner"))
+                        if "reason" in msg:
+                            print("Sebep:", msg.get("reason"))
                 except Exception as e:
                     print("Geçersiz JSON:", line)
 
