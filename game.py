@@ -248,6 +248,12 @@ class Game:
             return "black"
         return None
 
+    def is_game_over(self):
+        return self.check_winner() is not None
+
+    def get_winner(self):
+        return self.check_winner()
+
     # Öncesinde Referansını gönderiyormuşuz bu yüzden server tarafında bir değişiklikte sorun oluyordu.
     def get_state(self):
         return {

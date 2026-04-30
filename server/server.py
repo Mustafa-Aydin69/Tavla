@@ -25,6 +25,7 @@ class ClientContext:
         self.addr = addr
         self.opponent = None
         self.game = None
+        self.color = None
 
 
 class GameSession:
@@ -33,7 +34,6 @@ class GameSession:
 
         self.game = Game()
         self.players = [p1, p2]
-        self.turn = 0  # 0: p1, 1: p2
         self.lock = threading.Lock()
 
         p1.game = self
@@ -99,7 +99,7 @@ def handle_client(client: ClientContext):
                                     continue
 
                                 # 2. Sıra kontrolü
-                                if session.players[session.turn] != client:
+                                if session.game.current_player != client.color:
                                     send_safe(client.conn, {"type": "REJECT", "reason": "Not your turn"})
                                     continue
 
@@ -111,16 +111,13 @@ def handle_client(client: ClientContext):
                                     send_safe(client.conn, {"type": "REJECT", "reason": "Invalid move"})
                                     continue
 
-                                # 7. Turn değiştir (State'den önce değiştirilmeli)
-                                session.turn = 1 - session.turn
-
                                 # 5. STATE oluştur
                                 if not session.game:
                                     continue
                                 
                                 state = session.game.get_state()
-                                turn_color = "WHITE" if session.turn == 0 else "BLACK"
-                                last_player = "WHITE" if session.turn == 1 else "BLACK"
+                                turn_color = session.game.current_player.upper()
+                                last_player = "BLACK" if turn_color == "WHITE" else "WHITE"
 
                                 # 6. İki oyuncuya gönder
                                 for p in session.players:
@@ -241,6 +238,9 @@ def start_server():
                     # Rakipleri birbirine bağla (Çok Kritik!)
                     p1.opponent = p2
                     p2.opponent = p1
+                    
+                    p1.color = "white"
+                    p2.color = "black"
 
                     # GameSession oluştur
                     session = GameSession(p1, p2)
@@ -254,7 +254,7 @@ def start_server():
                     # MATCH sonrası INITIAL STATE gönder (Böylece Client boş ekranla başlamaz)
                     if hasattr(session.game, "get_state"):
                         state = session.game.get_state()
-                        turn_color = "WHITE" if session.turn == 0 else "BLACK"
+                        turn_color = session.game.current_player.upper()
                         send_safe(p1.conn, {"type": "STATE", "state": state, "turn": turn_color})
                         send_safe(p2.conn, {"type": "STATE", "state": state, "turn": turn_color})
 
