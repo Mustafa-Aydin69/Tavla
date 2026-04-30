@@ -8,6 +8,8 @@ PORT = 5000
 
 
 def listen(sock):
+    buffer = ""
+
     while True:
         try:
             data = sock.recv(1024)
@@ -15,7 +17,18 @@ def listen(sock):
                 print("Bağlantı kesildi.")
                 break
 
-            print("SERVER:", data.decode())
+            try:
+                buffer += data.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+
+                if not line.strip():
+                    continue
+
+                print("SERVER:", line)
 
         except Exception as e:
             print("Dinleme hatası:", e)
