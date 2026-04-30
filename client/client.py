@@ -5,6 +5,7 @@ from shared.protocol import encode, decode
 
 HOST = "127.0.0.1"
 PORT = 5000
+game_over_msg = None
 
 
 def handle_game_over(msg):
@@ -49,8 +50,9 @@ def listen(sock):
                     msg = decode(line)
                     print("SERVER:", msg)
                     if msg.get("type") == "GAME_OVER":
-                        action = handle_game_over(msg)
-                        return action
+                        global game_over_msg
+                        game_over_msg = msg
+                        return "GAME_OVER"
                 except Exception as e:
                     print("Geçersiz JSON:", line)
 
@@ -66,7 +68,9 @@ def start_client():
     print("Connected to server")
     while True:
         cmd = input(">>> ")
-
+        if game_over_msg:
+            action = handle_game_over(game_over_msg)
+            game_over_msg = None
         if cmd == "roll":
             sock.sendall(encode({"type": "ROLL"}))
 
