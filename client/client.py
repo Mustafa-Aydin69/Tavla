@@ -89,6 +89,9 @@ def listen():
                         log("\n[OYUN DURUMU]")
                         log(f"Sıra: {msg.get('turn')}")
                         log(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
+                        log(
+                            f"Geçerli hamleler: {msg.get('state', {}).get('valid_moves')}"
+                        )
 
                     elif msg_type == "REJECT":
                         log(f"\n[HATA] {msg.get('reason')}")
@@ -207,16 +210,8 @@ def start_client():
             action = handle_game_over(game_over_msg)
             game_over_msg = None
 
-        if action == "DISCONNECTED":
-            log("\nBağlantı koptu. Tekrar bağlanılsın mı? (y/n)")
-            while True:
-                secim = input("> ").lower()
-                if secim == "y":
-                    action = "RECONNECT"
-                    break
-                elif secim == "n":
-                    action = "EXIT"
-                    break
+        if action is None:
+            action = "EXIT"
 
         if action is None:
             action = "EXIT"
