@@ -2,6 +2,7 @@ import socket
 import threading
 import sys
 import os
+import queue
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import encode, decode
@@ -21,6 +22,10 @@ def log(msg):
     print(msg)
 
 
+def log_block(title):
+    print(f"\n=== {title} ===")
+
+
 def connect_to_server():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
@@ -36,14 +41,43 @@ def send_message(msg):
         log(f"[HATA] Mesaj gönderilemedi: {e}")
 
 
+input_queue = queue.Queue()
+
+def _input_worker():
+    while True:
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            input_queue.put(line)
+        except Exception:
+            break
+
+# Arkaplanda sürekli terminal girişlerini toplayacak thread
+threading.Thread(target=_input_worker, daemon=True).start()
+
+def safe_input(prompt=">>> "):
+    print(prompt, end="", flush=True)
+
+    while running:
+        try:
+            # 0.2 saniyede bir input_queue'yu kontrol et
+            return input_queue.get(timeout=0.2).strip()
+        except queue.Empty:
+            continue
+
+    return None
+
+
 def handle_game_over(msg):
-    log("\n=== OYUN BİTTİ ===")
+    log_block("OYUN BİTTİ")
     log(f"Kazanan: {msg.get('winner')}")
     if "reason" in msg:
         log(f"Sebep: {msg.get('reason')}")
 
     while True:
         secim = input("Tekrar oynamak ister misiniz? (y/n): ").lower()
+
         if secim == "y":
             return "RECONNECT"
         elif secim == "n":
@@ -60,9 +94,8 @@ def listen():
             data = sock.recv(1024)
 
             if not data:
-                log("\n[BAĞLANTI KESİLDİ]")
                 running = False
-                return "DISCONNECTED"
+                return "EXIT"
 
             try:
                 buffer += data.decode("utf-8")
@@ -86,12 +119,10 @@ def listen():
                         log(f"\n[EŞLEŞME] Renk: {msg.get('color')}")
 
                     elif msg_type == "STATE":
-                        log("\n[OYUN DURUMU]")
+                        log_block("OYUN DURUMU")
                         log(f"Sıra: {msg.get('turn')}")
                         log(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
-                        log(
-                            f"Geçerli hamleler: {msg.get('state', {}).get('valid_moves')}"
-                        )
+                        log(f"Hamleler: {msg.get('state', {}).get('valid_moves')}")
 
                     elif msg_type == "REJECT":
                         log(f"\n[HATA] {msg.get('reason')}")
@@ -100,6 +131,9 @@ def listen():
                         game_over_msg = msg
                         running = False
                         return "GAME_OVER"
+
+                    elif msg_type == "OPPONENT_DISCONNECTED":
+                        continue
 
                     else:
                         log(f"\n[SERVER] {msg}")
@@ -111,13 +145,14 @@ def listen():
             if running:
                 log(f"\n[HATA] {e}")
             running = False
-            return "DISCONNECTED"
+            return "EXIT"
 
     return "EXIT"
 
 
 def handle_command(cmd):
     parts = cmd.split()
+
     if not parts:
         return
 
@@ -178,10 +213,13 @@ def start_client():
 
         while running:
             try:
-                cmd = input(">>> ").strip()
+                cmd = safe_input()
 
                 if not running:
                     break
+
+                if cmd is None:
+                    continue
 
                 if not cmd:
                     continue
@@ -189,13 +227,13 @@ def start_client():
                 handle_command(cmd)
 
             except KeyboardInterrupt:
-                log("\nÇıkılıyor...")
+                log("\nProgram sonlandırıldı.")
                 running = False
-                break
-            except Exception as e:
-                log(f"Hata: {e}")
-                running = False
-                break
+                try:
+                    sock.close()
+                except:
+                    pass
+                return
 
         running = False
 
@@ -209,12 +247,6 @@ def start_client():
         if game_over_msg:
             action = handle_game_over(game_over_msg)
             game_over_msg = None
-
-        if action is None:
-            action = "EXIT"
-
-        if action is None:
-            action = "EXIT"
 
         if action == "RECONNECT":
             log("\nYeniden bağlanılıyor...\n")
