@@ -110,27 +110,47 @@ def listen():
 
 
 def handle_command(cmd):
-    if cmd == "roll":
+    parts = cmd.split()
+
+    if not parts:
+        return
+
+    if parts[0] == "roll":
         send_message({"type": "ROLL"})
         return
 
-    if cmd.startswith("move "):
-        try:
-            _, start, die = cmd.split()
-            send_message({"type": "MOVE", "moves": [(int(start), int(die))]})
-        except ValueError:
+    if parts[0] == "move":
+        if len(parts) != 3:
             print("Kullanım: move <start> <die>")
+            return
+
+        try:
+            start = int(parts[1])
+            die = int(parts[2])
+
+            if start < 0:
+                print("Geçersiz start değeri.")
+                return
+
+            if die <= 0:
+                print("Geçersiz zar değeri.")
+                return
+
+            send_message({"type": "MOVE", "moves": [(start, die)]})
+
+        except ValueError:
+            print("start ve die sayı olmalıdır.")
         return
 
-    if cmd in ("help", "?"):
-        print("Komutlar:")
+    if parts[0] in ("help", "?"):
+        print("\nKomutlar:")
         print("  roll")
         print("  move <start> <die>")
         print("  help")
         print("  quit")
         return
 
-    if cmd == "quit":
+    if parts[0] == "quit":
         raise KeyboardInterrupt
 
     print("Bilinmeyen komut. Yardım için: help")
