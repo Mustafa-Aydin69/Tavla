@@ -6,18 +6,22 @@ import json
 import logging
 
 # Loglama ayarları
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("Server")
 
 # shared.protocol importu için gerekli
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import decode, encode
 
+
 def send_safe(conn, msg):
     try:
         conn.sendall(encode(msg))
     except Exception as e:
         logger.error(f"Send failed: {e}")
+
 
 class ClientContext:
     def __init__(self, conn, addr):
@@ -95,12 +99,18 @@ def handle_client(client: ClientContext):
                             with session.lock:
                                 moves = msg.get("moves")
                                 if not isinstance(moves, list):
-                                    send_safe(client.conn, {"type": "REJECT", "reason": "Invalid format"})
+                                    send_safe(
+                                        client.conn,
+                                        {"type": "REJECT", "reason": "Invalid format"},
+                                    )
                                     continue
 
                                 # 2. Sıra kontrolü
                                 if session.game.current_player != client.color:
-                                    send_safe(client.conn, {"type": "REJECT", "reason": "Not your turn"})
+                                    send_safe(
+                                        client.conn,
+                                        {"type": "REJECT", "reason": "Not your turn"},
+                                    )
                                     continue
 
                                 # 3. Move uygulama
@@ -108,25 +118,33 @@ def handle_client(client: ClientContext):
 
                                 # 4. Başarısızsa REJECT
                                 if not success:
-                                    send_safe(client.conn, {"type": "REJECT", "reason": "Invalid move"})
+                                    send_safe(
+                                        client.conn,
+                                        {"type": "REJECT", "reason": "Invalid move"},
+                                    )
                                     continue
 
                                 # 5. STATE oluştur
                                 if not session.game:
                                     continue
-                                
+
                                 state = session.game.get_state()
-                                turn_color = session.game.current_player.upper()
-                                last_player = "BLACK" if turn_color == "WHITE" else "WHITE"
+                                turn_color = session.game.current_player
+                                last_player = (
+                                    "black" if turn_color == "white" else "white"
+                                )
 
                                 # 6. İki oyuncuya gönder
                                 for p in session.players:
-                                    send_safe(p.conn, {
-                                        "type": "STATE",
-                                        "state": state,
-                                        "turn": turn_color,
-                                        "last_player": last_player
-                                    })
+                                    send_safe(
+                                        p.conn,
+                                        {
+                                            "type": "STATE",
+                                            "state": state,
+                                            "turn": turn_color,
+                                            "last_player": last_player,
+                                        },
+                                    )
 
                                 # 8. Kazanma kontrolü (opsiyonel)
                                 # is_game_over() fonksiyonu True/False dönecek
@@ -137,22 +155,26 @@ def handle_client(client: ClientContext):
                                 ):
                                     winner = session.game.get_winner()
                                     for p in session.players:
-                                        send_safe(p.conn, {"type": "GAME_OVER", "winner": winner})
+                                        send_safe(
+                                            p.conn,
+                                            {"type": "GAME_OVER", "winner": winner},
+                                        )
                                         p.game = None
                                         p.opponent = None
-                                    
+
                                     # Profesyonel temizlik
                                     session.players.clear()
                                     session.game = None
 
                     except json.JSONDecodeError as e:
-                        logger.error(f"Invalid JSON from {client.addr}: {e} (Line: {line})")
+                        logger.error(
+                            f"Invalid JSON from {client.addr}: {e} (Line: {line})"
+                        )
                     except Exception as e:
                         logger.error(f"Decode/Processing error from {client.addr}: {e}")
-                        send_safe(client.conn, {
-                            "type": "REJECT",
-                            "reason": "Server error"
-                        })
+                        send_safe(
+                            client.conn, {"type": "REJECT", "reason": "Server error"}
+                        )
 
     except Exception as e:
         # Beklenmedik bir şekilde bağlantı koparsa buraya düşer
@@ -178,13 +200,12 @@ def handle_client(client: ClientContext):
         if client.game:
             session = client.game
             for p in session.players:
-                send_safe(p.conn, {
-                    "type": "GAME_OVER",
-                    "reason": "Opponent disconnected"
-                })
+                send_safe(
+                    p.conn, {"type": "GAME_OVER", "reason": "Opponent disconnected"}
+                )
                 p.game = None
                 p.opponent = None
-            
+
             session.players.clear()
             session.game = None
 
@@ -238,7 +259,7 @@ def start_server():
                     # Rakipleri birbirine bağla (Çok Kritik!)
                     p1.opponent = p2
                     p2.opponent = p1
-                    
+
                     p1.color = "white"
                     p2.color = "black"
 
@@ -246,17 +267,23 @@ def start_server():
                     session = GameSession(p1, p2)
 
                     # MATCH mesajlarını gönder
-                    send_safe(p1.conn, {"type": "MATCH", "color": "WHITE"})
-                    send_safe(p2.conn, {"type": "MATCH", "color": "BLACK"})
+                    send_safe(p1.conn, {"type": "MATCH", "color": "white"})
+                    send_safe(p2.conn, {"type": "MATCH", "color": "black"})
 
                     logger.info(f"[MATCH] {p1.addr} vs {p2.addr}")
 
                     # MATCH sonrası INITIAL STATE gönder (Böylece Client boş ekranla başlamaz)
                     if hasattr(session.game, "get_state"):
                         state = session.game.get_state()
-                        turn_color = session.game.current_player.upper()
-                        send_safe(p1.conn, {"type": "STATE", "state": state, "turn": turn_color})
-                        send_safe(p2.conn, {"type": "STATE", "state": state, "turn": turn_color})
+                        turn_color = session.game.current_player
+                        send_safe(
+                            p1.conn,
+                            {"type": "STATE", "state": state, "turn": turn_color},
+                        )
+                        send_safe(
+                            p2.conn,
+                            {"type": "STATE", "state": state, "turn": turn_color},
+                        )
 
     except KeyboardInterrupt:
         logger.info("Server shutting down.")
