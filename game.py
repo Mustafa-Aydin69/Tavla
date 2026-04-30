@@ -260,6 +260,12 @@ class Game:
             "winner": self.check_winner(),
         }
 
+    def apply_move_sequence(self, moves):
+        for start, die in moves:
+            if not self.move(start, die):
+                return False
+        return True
+
 
 # TEST
 if __name__ == "__main__":
