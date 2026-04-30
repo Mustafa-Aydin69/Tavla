@@ -248,13 +248,15 @@ class Game:
             return "black"
         return None
 
+    # Öncesinde Referansını gönderiyormuşuz bu yüzden server tarafında bir değişiklikte sorun oluyordu.
     def get_state(self):
         return {
             "points": [{"owner": p.owner, "count": p.count} for p in self.board.points],
-            "bar": self.board.bar,
-            "bear_off": self.board.bear_off,
+            "bar": dict(self.board.bar),
+            "bear_off": dict(self.board.bear_off),
             "current_player": self.current_player,
-            "moves_left": self.moves_left,
+            "moves_left": list(self.moves_left),
+            "valid_moves": self.get_valid_moves(),
             "winner": self.check_winner(),
         }
 
