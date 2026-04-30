@@ -47,6 +47,7 @@ def listen():
         try:
             data = sock.recv(1024)
             if not data:
+                running = False
                 return "EXIT"
 
             try:
@@ -66,6 +67,7 @@ def listen():
 
                     if msg.get("type") == "GAME_OVER":
                         game_over_msg = msg
+                        running = False
                         return "GAME_OVER"
 
                 except Exception:
@@ -74,6 +76,7 @@ def listen():
         except Exception as e:
             if running:
                 print("Dinleme hatası:", e)
+            running = False
             break
 
     return "EXIT"
@@ -97,8 +100,6 @@ def start_client():
         def run_listener():
             nonlocal action
             action = listen()
-            global running
-            running = False
 
         t = threading.Thread(target=run_listener, daemon=True)
         t.start()
@@ -128,20 +129,26 @@ def start_client():
                 break
             except Exception as e:
                 print("Hata:", e)
+                running = False
                 break
 
-        # Socket temizliği
+        # Thread ve socket temizliği
+        running = False
+
         try:
             sock.close()
         except:
             pass
 
-        # GAME_OVER geldiyse kullanıcıya sor
+        t.join(timeout=1)
+
         if game_over_msg:
             action = handle_game_over(game_over_msg)
             game_over_msg = None
 
-        # reconnect / exit
+        if action is None:
+            action = "EXIT"
+
         if action == "RECONNECT":
             print("Yeniden bağlanılıyor...\n")
             continue
