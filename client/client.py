@@ -7,6 +7,23 @@ HOST = "127.0.0.1"
 PORT = 5000
 
 
+def handle_game_over(msg):
+    print("\n=== GAME OVER ===")
+    print("Winner:", msg.get("winner"))
+    if "reason" in msg:
+        print("Reason:", msg.get("reason"))
+
+    while True:
+        choice = input("Play again? (y/n): ").lower()
+
+        if choice == "y":
+            return "RECONNECT"
+        elif choice == "n":
+            return "EXIT"
+        else:
+            print("Please enter y or n.")
+
+
 def listen(sock):
     buffer = ""
 
@@ -32,10 +49,8 @@ def listen(sock):
                     msg = decode(line)
                     print("SERVER:", msg)
                     if msg.get("type") == "GAME_OVER":
-                        print("\n=== OYUN BİTTİ ===")
-                        print("Kazanan:", msg.get("winner"))
-                        if "reason" in msg:
-                            print("Sebep:", msg.get("reason"))
+                        action = handle_game_over(msg)
+                        return action
                 except Exception as e:
                     print("Geçersiz JSON:", line)
 
