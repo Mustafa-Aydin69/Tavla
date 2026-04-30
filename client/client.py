@@ -55,9 +55,11 @@ def listen():
     while running:
         try:
             data = sock.recv(1024)
+
             if not data:
+                print("\n[BAĞLANTI KESİLDİ] Sunucu bağlantıyı kapattı.")
                 running = False
-                return "EXIT"
+                return "DISCONNECTED"
 
             try:
                 buffer += data.decode("utf-8")
@@ -72,7 +74,6 @@ def listen():
 
                 try:
                     msg = decode(line)
-
                     msg_type = msg.get("type")
 
                     if msg_type == "WAITING":
@@ -100,11 +101,16 @@ def listen():
                 except Exception:
                     print("Geçersiz JSON:", line)
 
+        except ConnectionResetError:
+            print("\n[HATA] Sunucu bağlantıyı zorla kapattı.")
+            running = False
+            return "DISCONNECTED"
+
         except Exception as e:
             if running:
-                print("Dinleme hatası:", e)
+                print("\n[HATA] Bağlantı hatası:", e)
             running = False
-            break
+            return "DISCONNECTED"
 
     return "EXIT"
 
@@ -162,11 +168,10 @@ def start_client():
     while True:
         running = True
         game_over_msg = None
-
         try:
             sock = connect_to_server()
         except Exception as e:
-            print("Bağlantı hatası:", e)
+            print(f"Failed to connect: {e}")
             break
 
         action = None
@@ -174,33 +179,44 @@ def start_client():
         def run_listener():
             nonlocal action
             action = listen()
+            global running
+            running = False
 
         t = threading.Thread(target=run_listener, daemon=True)
         t.start()
 
         while running:
             try:
-                cmd = input(">>> ").strip()
+                # Kullanıcı >>> da beklerken mesaj gelip oyun biterse
+                # bu input'a bir şey girip Enter'a basana kadar burada asılı kalır.
+                # Enter'a basınca running=False olduğunu anlayıp döngüden çıkacak.
+                cmd = input(">>> ")
 
                 if not running:
                     break
 
-                if not cmd:
-                    continue
+                if cmd == "roll":
+                    sock.sendall(encode({"type": "ROLL"}))
 
-                handle_command(cmd)
+                elif cmd.startswith("move"):
+                    try:
+                        _, start, die = cmd.split()
+                        sock.sendall(
+                            encode({"type": "MOVE", "moves": [(int(start), int(die))]})
+                        )
+                    except ValueError:
+                        print("Usage: move <start> <die>")
 
             except KeyboardInterrupt:
-                print("\nÇıkılıyor...")
+                print("\nExiting...")
                 running = False
                 break
             except Exception as e:
-                print("Hata:", e)
-                running = False
+                print("Error:", e)
                 break
 
+        # Thread ve socket temizliği
         running = False
-
         try:
             sock.close()
         except:
@@ -216,10 +232,10 @@ def start_client():
             action = "EXIT"
 
         if action == "RECONNECT":
-            print("Yeniden bağlanılıyor...\n")
+            print("Reconnecting...\n")
             continue
         else:
-            print("Program sonlandırıldı.")
+            print("Goodbye.")
             break
 
 
