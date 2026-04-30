@@ -22,6 +22,15 @@ def connect_to_server():
     return s
 
 
+def send_message(msg):
+    global sock
+
+    try:
+        sock.sendall(encode(msg))
+    except Exception as e:
+        print("Mesaj gönderilemedi:", e)
+
+
 def handle_game_over(msg):
     print("\n=== OYUN BİTTİ ===")
     print("Kazanan:", msg.get("winner"))
@@ -82,6 +91,33 @@ def listen():
     return "EXIT"
 
 
+def handle_command(cmd):
+    if cmd == "roll":
+        send_message({"type": "ROLL"})
+        return
+
+    if cmd.startswith("move "):
+        try:
+            _, start, die = cmd.split()
+            send_message({"type": "MOVE", "moves": [(int(start), int(die))]})
+        except ValueError:
+            print("Kullanım: move <start> <die>")
+        return
+
+    if cmd in ("help", "?"):
+        print("Komutlar:")
+        print("  roll")
+        print("  move <start> <die>")
+        print("  help")
+        print("  quit")
+        return
+
+    if cmd == "quit":
+        raise KeyboardInterrupt
+
+    print("Bilinmeyen komut. Yardım için: help")
+
+
 def start_client():
     global sock, running, game_over_msg
 
@@ -106,22 +142,15 @@ def start_client():
 
         while running:
             try:
-                cmd = input(">>> ")
+                cmd = input(">>> ").strip()
 
                 if not running:
                     break
 
-                if cmd == "roll":
-                    sock.sendall(encode({"type": "ROLL"}))
+                if not cmd:
+                    continue
 
-                elif cmd.startswith("move"):
-                    try:
-                        _, start, die = cmd.split()
-                        sock.sendall(
-                            encode({"type": "MOVE", "moves": [(int(start), int(die))]})
-                        )
-                    except ValueError:
-                        print("Kullanım: move <start> <die>")
+                handle_command(cmd)
 
             except KeyboardInterrupt:
                 print("\nÇıkılıyor...")
@@ -132,7 +161,6 @@ def start_client():
                 running = False
                 break
 
-        # Thread ve socket temizliği
         running = False
 
         try:
