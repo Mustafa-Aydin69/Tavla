@@ -15,6 +15,7 @@ MOVE = "MOVE"
 
 input_queue = queue.Queue()
 
+
 def _input_worker():
     while True:
         try:
@@ -25,11 +26,14 @@ def _input_worker():
         except Exception:
             break
 
+
 # Arkaplanda sürekli terminal girişlerini toplayacak thread
 threading.Thread(target=_input_worker, daemon=True).start()
 
+
 def log(msg):
     print(msg)
+
 
 def log_block(title):
     print(f"\n=== {title} ===")
@@ -252,6 +256,7 @@ class GameClient:
             else:
                 log("Program sonlandırıldı.")
                 break
+
 
 if __name__ == "__main__":
     client = GameClient()
