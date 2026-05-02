@@ -29,6 +29,7 @@ class GameClient:
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((HOST, PORT))
+        self.sock.settimeout(0.5)
         log("Sunucuya bağlanıldı.")
 
     def send(self, msg):
@@ -75,25 +76,14 @@ class GameClient:
                         if self.on_message:
                             self.on_message(msg)
 
-                        if msg_type == "WAITING":
-                            log("Rakip bekleniyor...")
-
-                        elif msg_type == "MATCH":
-                            log(f"Eşleşme sağlandı. Renk: {msg.get('color')}")
-
-                        elif msg_type == "STATE":
-                            # Terminal spam'i yapmasın, UI veya callback bunu işleyecek
-                            pass
-
-                        elif msg_type == "REJECT":
+                        if msg_type == "REJECT":
                             log(f"[HATA] {msg.get('reason')}")
-
-                        elif msg_type == "OPPONENT_DISCONNECTED":
-                            log("Rakip oyundan ayrıldı.")
 
                     except Exception:
                         log(f"Geçersiz JSON: {line}")
 
+            except socket.timeout:
+                continue
             except Exception as e:
                 if self.running:
                     log(f"\n[HATA] {e}")
