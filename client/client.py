@@ -25,6 +25,7 @@ class GameClient:
         self.sock = None
         self.game_over_msg = None
         self.on_message = None
+        self.thread = None
 
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -103,9 +104,20 @@ class GameClient:
             log(f"Bağlantı hatası: {e}")
             return
 
-        t = threading.Thread(target=self.listen, daemon=True)
-        t.start()
+        self.thread = threading.Thread(target=self.listen, daemon=True)
+        self.thread.start()
 
+    def stop(self):
+        self.running = False
+
+        try:
+            if self.sock:
+                self.sock.close()
+        except:
+            pass
+
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1)
 
 if __name__ == "__main__":
     # Test amaçlı
