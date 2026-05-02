@@ -77,10 +77,11 @@ class GameClient:
                             self.on_message(msg)
 
                         if msg_type == "REJECT":
-                            log(f"[HATA] {msg.get('reason')}")
+                            if not self.on_message:
+                                log(f"[HATA] {msg.get('reason')}")
 
-                    except Exception:
-                        log(f"Geçersiz JSON: {line}")
+                    except Exception as e:
+                        log(f"[JSON HATA] Veri parse edilemedi: {e} | Raw: {line}")
 
             except socket.timeout:
                 continue
