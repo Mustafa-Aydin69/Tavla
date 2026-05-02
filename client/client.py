@@ -28,10 +28,15 @@ class GameClient:
         self.thread = None
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((HOST, PORT))
-        self.sock.settimeout(0.5)
-        log("Sunucuya bağlanıldı.")
+        try:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.connect((HOST, PORT))
+            self.sock.settimeout(0.5)
+            log("Sunucuya bağlanıldı.")
+        except Exception as e:
+            self.sock = None
+            log(f"[CONNECT HATA] {e}")
+            raise
 
     def send(self, msg):
         try:
@@ -113,8 +118,8 @@ class GameClient:
         try:
             if self.sock:
                 self.sock.close()
-        except:
-            pass
+        except Exception as e:
+            log(f"[STOP HATA] {e}")
 
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1)
