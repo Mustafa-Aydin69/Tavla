@@ -45,13 +45,14 @@ class GameClient:
         self.sock = None
         self.game_over_msg = None
 
-    def connect(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((HOST, PORT))
-        log("Sunucuya bağlanıldı.")
-        return s
+        self.on_message = None
 
-    def send_message(self, msg):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((HOST, PORT))
+        log("Sunucuya bağlanıldı.")
+
+    def send(self, msg):
         try:
             self.sock.sendall(encode(msg))
         except Exception as e:
@@ -118,31 +119,31 @@ class GameClient:
                         msg = decode(line)
                         msg_type = msg.get("type")
 
-                        if msg_type == "WAITING":
-                            log("\n[BEKLEME] Rakip bekleniyor...")
-
-                        elif msg_type == "MATCH":
-                            log(f"\n[EŞLEŞME] Renk: {msg.get('color')}")
-
-                        elif msg_type == "STATE":
-                            log_block("OYUN DURUMU")
-                            log(f"Sıra: {msg.get('turn')}")
-                            log(f"Zarlar: {msg.get('state', {}).get('moves_left')}")
-                            log(f"Hamleler: {msg.get('state', {}).get('valid_moves')}")
-
-                        elif msg_type == "REJECT":
-                            log(f"\n[HATA] {msg.get('reason')}")
-
-                        elif msg_type == "GAME_OVER":
+                        if msg_type == "GAME_OVER":
                             self.game_over_msg = msg
                             self.running = False
+
+                        if self.on_message:
+                            self.on_message(msg)
+
+                        if msg_type == "WAITING":
+                            log("Rakip bekleniyor...")
+
+                        elif msg_type == "MATCH":
+                            log(f"Eşleşme sağlandı. Renk: {msg.get('color')}")
+
+                        elif msg_type == "STATE":
+                            # Terminal spam'i yapmasın, UI veya callback bunu işleyecek
+                            pass
+
+                        elif msg_type == "REJECT":
+                            log(f"[HATA] {msg.get('reason')}")
+
+                        elif msg_type == "GAME_OVER":
                             return "GAME_OVER"
 
                         elif msg_type == "OPPONENT_DISCONNECTED":
-                            continue
-
-                        else:
-                            log(f"\n[SERVER] {msg}")
+                            log("Rakip oyundan ayrıldı.")
 
                     except Exception:
                         log(f"Geçersiz JSON: {line}")
@@ -162,7 +163,7 @@ class GameClient:
             return
 
         if parts[0] == "roll":
-            self.send_message({"type": ROLL})
+            self.send({"type": ROLL})
             return
 
         if parts[0] == "move":
@@ -178,7 +179,7 @@ class GameClient:
                     log("Geçersiz değerler.")
                     return
 
-                self.send_message({"type": MOVE, "moves": [(start, die)]})
+                self.send({"type": MOVE, "moves": [(start, die)]})
 
             except ValueError:
                 log("start ve die sayı olmalıdır.")
@@ -199,7 +200,7 @@ class GameClient:
             self.game_over_msg = None
 
             try:
-                self.sock = self.connect()
+                self.connect()
             except Exception as e:
                 log(f"Bağlantı hatası: {e}")
                 break
