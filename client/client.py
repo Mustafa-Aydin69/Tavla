@@ -43,6 +43,7 @@ def send_message(msg):
 
 input_queue = queue.Queue()
 
+
 def _input_worker():
     while True:
         try:
@@ -53,8 +54,10 @@ def _input_worker():
         except Exception:
             break
 
+
 # Arkaplanda sürekli terminal girişlerini toplayacak thread
 threading.Thread(target=_input_worker, daemon=True).start()
+
 
 def safe_input(prompt=">>> "):
     print(prompt, end="", flush=True)
@@ -77,7 +80,7 @@ def handle_game_over(msg):
 
     while True:
         print("Tekrar oynamak ister misiniz? (y/n): ", end="", flush=True)
-        
+
         # input() kullanmak yerine arkaplan thread'inin topladığı kuyruktan oku
         secim = ""
         while True:
