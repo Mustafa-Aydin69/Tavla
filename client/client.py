@@ -39,6 +39,10 @@ class GameClient:
             raise
 
     def send(self, msg):
+        if not self.sock:
+            log("[SEND HATA] Socket yok.")
+            return
+
         try:
             self.sock.sendall(encode(msg))
         except Exception as e:
@@ -123,6 +127,8 @@ class GameClient:
 
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1)
+
+        self.thread = None
 
 if __name__ == "__main__":
     # Test amaçlı
