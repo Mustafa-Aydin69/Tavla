@@ -123,6 +123,11 @@ class GameClient:
                             self.game_over_msg = msg
                             self.running = False
 
+                            if self.on_message:
+                                self.on_message(msg)
+
+                            return "GAME_OVER"
+
                         if self.on_message:
                             self.on_message(msg)
 
@@ -138,9 +143,6 @@ class GameClient:
 
                         elif msg_type == "REJECT":
                             log(f"[HATA] {msg.get('reason')}")
-
-                        elif msg_type == "GAME_OVER":
-                            return "GAME_OVER"
 
                         elif msg_type == "OPPONENT_DISCONNECTED":
                             log("Rakip oyundan ayrıldı.")
