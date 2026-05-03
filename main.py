@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox
+from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox, QLabel
 from game_ui import Ui_Oyun_Tahtasi
 import sys
 from client.client import GameClient
@@ -19,6 +19,10 @@ class GameWindow(QMainWindow):
         self.boardContainer = self.ui.boardContainer
 
         self.init_board()
+
+        self.validMovesLabel = QLabel("Geçerli hamleler bekleniyor...")
+        self.validMovesLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+        self.ui.horizontalLayout_2.addWidget(self.validMovesLabel)
 
         self.client = GameClient()
         self.bridge = SignalBridge()
@@ -95,6 +99,14 @@ class GameWindow(QMainWindow):
                 elif len(dice) >= 3:
                     self.ui.Zar_lcdNumber_lcdNumber_2.setText(f"{dice[0]} (x{len(dice)})")
                     self.ui.dice_lcdNumber.setText("")
+
+                # Geçerli hamleleri göster
+                valid_moves = state.get("valid_moves", [])
+                if valid_moves:
+                    moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
+                    self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
+                else:
+                    self.validMovesLabel.setText("Geçerli hamle yok")
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)
