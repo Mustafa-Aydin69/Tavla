@@ -93,8 +93,8 @@ class GameWindow(QMainWindow):
                     self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
                     self.ui.dice_lcdNumber.setText(str(dice[1]))
                 elif len(dice) >= 3:
-                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
-                    self.ui.dice_lcdNumber.setText(f"{dice[0]} (x{len(dice)})")
+                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(f"{dice[0]} (x{len(dice)})")
+                    self.ui.dice_lcdNumber.setText("")
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)
