@@ -24,6 +24,9 @@ class GameWindow(QMainWindow):
         self.validMovesLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
         self.ui.horizontalLayout_2.addWidget(self.validMovesLabel)
 
+        self.valid_starts = set()
+        self.selected_start = None
+
         self.client = GameClient()
         self.bridge = SignalBridge()
 
@@ -102,14 +105,42 @@ class GameWindow(QMainWindow):
 
                 # Geçerli hamleleri göster
                 valid_moves = state.get("valid_moves", [])
+                
+                self.valid_starts = set(m[0] for m in valid_moves)
+                self.selected_start = None
+                
                 if valid_moves:
                     moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
                     self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
                 else:
                     self.validMovesLabel.setText("Geçerli hamle yok")
 
+                # Butonları valid_starts'a göre renklendir
+                for i in range(24):
+                    if i in self.valid_starts:
+                        self.points[i].setStyleSheet("background-color: yellow; color: black; font-weight: bold;")
+                    else:
+                        self.points[i].setStyleSheet("")
+
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)
+
+    def on_point_clicked(self, index):
+        if index not in self.valid_starts:
+            return
+
+        self.selected_start = index
+
+        # Tüm geçerli olanları sarıya geri döndür
+        for i in range(24):
+            if i in self.valid_starts:
+                self.points[i].setStyleSheet("background-color: yellow; color: black; font-weight: bold;")
+            else:
+                self.points[i].setStyleSheet("")
+
+        # Seçilen butonu yeşil yap
+        if 0 <= index <= 23:
+            self.points[index].setStyleSheet("background-color: lightgreen; color: black; font-weight: bold;")
 
     def init_board(self):
         from PySide6.QtWidgets import QPushButton, QGridLayout
@@ -122,6 +153,7 @@ class GameWindow(QMainWindow):
         for i in range(24):
             btn = QPushButton(str(i))
             btn.setFixedSize(60, 100)
+            btn.clicked.connect(lambda checked=False, i=i: self.on_point_clicked(i))
 
             row = 0 if i < 12 else 1
             col = i if i < 12 else 23 - i
