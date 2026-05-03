@@ -128,17 +128,46 @@ class GameWindow(QMainWindow):
         print("UI aldı:", msg)
 
     def on_point_clicked(self, index):
-        if index not in self.valid_starts:
-            return
-
-        self.selected_start = index
+        if self.selected_start is not None:
+            # Hedef kontrolü
+            selected_move = None
+            for move in self.valid_moves:
+                if move[0] == self.selected_start and move[1] == index:
+                    selected_move = move
+                    break
+            
+            if selected_move:
+                # Doğru hedef, hamleyi gönder
+                die = selected_move[2]
+                if self.client:
+                    self.client.send({
+                        "type": "MOVE",
+                        "moves": [(self.selected_start, die)]
+                    })
+                
+                self.selected_start = None
+                # Gönderdikten sonra highlight'ları temizle
+                for i in range(24):
+                    self.points[i].setStyleSheet("")
+                return
+            
+            # Eğer hedefe tıklamadıysa, belki başka bir başlangıç taşı seçmiştir
+            if index in self.valid_starts:
+                self.selected_start = index
+            else:
+                return  # İlgisiz tıklama
+        else:
+            # Henüz başlangıç seçilmediyse
+            if index not in self.valid_starts:
+                return
+            self.selected_start = index
 
         # Bu taş için gidebileceği hedefleri bul
-        targets = [move[1] for move in self.valid_moves if move[0] == index]
+        targets = [move[1] for move in self.valid_moves if move[0] == self.selected_start]
 
         # Buton renklerini güncelle
         for i in range(24):
-            if i == index:
+            if i == self.selected_start:
                 # Seçilen taş
                 self.points[i].setStyleSheet("background-color: lightgreen; color: black; font-weight: bold;")
             elif i in targets:
