@@ -24,6 +24,10 @@ class GameWindow(QMainWindow):
         self.validMovesLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
         self.ui.horizontalLayout_2.addWidget(self.validMovesLabel)
 
+        self.statusLabel = QLabel("Oyun bekleniyor...")
+        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: darkred;")
+        self.ui.horizontalLayout_2.addWidget(self.statusLabel)
+
         self.valid_starts = set()
         self.selected_start = None
         self.valid_moves = []
@@ -88,6 +92,7 @@ class GameWindow(QMainWindow):
                 self.update_dice(state)
                 self.update_valid_moves(state)
                 self.update_board(state)
+                self.update_status(state)
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
@@ -169,6 +174,22 @@ class GameWindow(QMainWindow):
                 btn.setText(str(i))
                 btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
 
+    def update_status(self, state):
+        current_player = state.get("current_player")
+        moves_left = state.get("moves_left", [])
+        valid_moves = state.get("valid_moves", [])
+
+        if current_player != self.my_color:
+            self.statusLabel.setText("Rakip oynuyor")
+        elif not moves_left:
+            self.statusLabel.setText("Zar at")
+        elif not valid_moves:
+            self.statusLabel.setText("Hamle yok")
+        elif -1 in self.valid_starts:
+            self.statusLabel.setText("Önce kırılan taşı gir")
+        else:
+            self.statusLabel.setText("Hamle yap")
+
     def on_point_clicked(self, index):
         if self.bar_active:
             selected_move = None
@@ -190,6 +211,7 @@ class GameWindow(QMainWindow):
                     self.points[i].setStyleSheet("")
                 return
             else:
+                self.statusLabel.setText("Geçersiz seçim")
                 return
 
         if self.selected_start is not None:
@@ -219,10 +241,12 @@ class GameWindow(QMainWindow):
             if index in self.valid_starts:
                 self.selected_start = index
             else:
+                self.statusLabel.setText("Geçersiz seçim")
                 return  # İlgisiz tıklama
         else:
             # Henüz başlangıç seçilmediyse
             if index not in self.valid_starts:
+                self.statusLabel.setText("Geçersiz seçim")
                 return
             self.selected_start = index
 
