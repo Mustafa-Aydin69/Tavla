@@ -28,6 +28,24 @@ class GameWindow(QMainWindow):
         self.client.start()
 
     def handle_server_message(self, msg):
+        msg_type = msg.get("type")
+
+        if msg_type == "WAITING":
+            self.ui.player_status.setText("Rakip bekleniyor...")
+
+        elif msg_type == "MATCH":
+            color = msg.get("color")
+            # Türkçeleştirme
+            if color == "white":
+                display_color = "Beyaz"
+            elif color == "black":
+                display_color = "Siyah"
+            else:
+                display_color = color
+
+            self.ui.player_status.setText(f"Renginiz: {display_color}")
+
+        # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)
 
     def init_board(self):
