@@ -1,7 +1,11 @@
 from PySide6.QtWidgets import QMainWindow, QApplication
 from game_ui import Ui_Oyun_Tahtasi
 import sys
+from client.client import GameClient
+from signal_bridge import SignalBridge
+
 print(sys.executable)
+
 
 class GameWindow(QMainWindow):
     def __init__(self):
@@ -10,10 +14,21 @@ class GameWindow(QMainWindow):
         self.ui = Ui_Oyun_Tahtasi()
         self.ui.setupUi(self)
 
-        # 🔥 direkt erişim
+        # direkt erişim
         self.boardContainer = self.ui.boardContainer
 
         self.init_board()
+
+        self.client = GameClient()
+        self.bridge = SignalBridge()
+
+        self.client.on_message = lambda msg: self.bridge.message.emit(msg)
+        self.bridge.message.connect(self.handle_server_message)
+
+        self.client.start()
+
+    def handle_server_message(self, msg):
+        print("UI aldı:", msg)
 
     def init_board(self):
         from PySide6.QtWidgets import QPushButton, QGridLayout
