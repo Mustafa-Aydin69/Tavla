@@ -54,7 +54,7 @@ class Game:
         self.board = Board()
         self.dice = Dice()
         self.current_player = "white"
-        self.moves_left = self.dice.roll()
+        self.moves_left = []
 
     def print_status(self):
         print("Sıra:", self.current_player)
@@ -185,16 +185,19 @@ class Game:
 
     def switch_turn(self):
         self.current_player = self._get_opponent()
-        self.moves_left = self.dice.roll()
+        self.moves_left = []
         print("Yeni sıra:", self.current_player)
-        print("Yeni zarlar:", self.moves_left)
-        if not self.has_any_valid_move():
-            print("Geçerli hamle yok, tur geçiyor.")
 
-            self.current_player = self._get_opponent()
-            self.moves_left = self.dice.roll()
-            print("Yeni sıra:", self.current_player)
-            print("Yeni zarlar:", self.moves_left)
+    def roll_dice(self):
+        if self.moves_left:
+            return False
+
+        self.moves_left = self.dice.roll()
+
+        if not self.has_any_valid_move():
+            self.switch_turn()
+
+        return True
 
     def get_valid_moves(self):
         valid_moves = []
