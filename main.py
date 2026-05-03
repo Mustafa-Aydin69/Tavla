@@ -27,6 +27,7 @@ class GameWindow(QMainWindow):
         self.valid_starts = set()
         self.selected_start = None
         self.valid_moves = []
+        self.bar_active = False
 
         self.client = GameClient()
         self.bridge = SignalBridge()
@@ -126,6 +127,7 @@ class GameWindow(QMainWindow):
         
         self.valid_starts = set(m[0] for m in valid_moves)
         self.selected_start = None
+        self.bar_active = -1 in self.valid_starts
         
         if valid_moves:
             moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
@@ -159,6 +161,28 @@ class GameWindow(QMainWindow):
                 btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
 
     def on_point_clicked(self, index):
+        if self.bar_active:
+            selected_move = None
+            for move in self.valid_moves:
+                if move[0] == -1 and move[1] == index:
+                    selected_move = move
+                    break
+            
+            if selected_move:
+                die = selected_move[2]
+                if self.client:
+                    self.client.send({
+                        "type": "MOVE",
+                        "moves": [(-1, die)]
+                    })
+                
+                self.bar_active = False
+                for i in range(24):
+                    self.points[i].setStyleSheet("")
+                return
+            else:
+                return
+
         if self.selected_start is not None:
             # Hedef kontrolü
             selected_move = None
