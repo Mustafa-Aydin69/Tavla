@@ -82,7 +82,8 @@ class GameWindow(QMainWindow):
         elif msg_type == "STATE":
             state = msg.get("state")
             if state is not None:
-                print("STATE:", state)
+                print("STATE geldi, UI resetlendi")
+                self.reset_ui()
                 self.update_turn(state)
                 self.update_dice(state)
                 self.update_valid_moves(state)
@@ -90,6 +91,14 @@ class GameWindow(QMainWindow):
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
+
+    def reset_ui(self):
+        self.selected_start = None
+        self.bar_active = False
+        
+        for i in range(24):
+            if i < len(self.points):
+                self.points[i].setStyleSheet("")
 
     def update_turn(self, state):
         current_player = state.get("current_player")
