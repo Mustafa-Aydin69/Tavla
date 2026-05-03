@@ -32,6 +32,10 @@ class GameWindow(QMainWindow):
         self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
         self.ui.horizontalLayout_2.addWidget(self.barLabel)
 
+        self.bearOffLabel = QLabel("Henüz çıkan taş yok")
+        self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.ui.horizontalLayout_2.addWidget(self.bearOffLabel)
+
         self.valid_starts = set()
         self.selected_start = None
         self.valid_moves = []
@@ -98,6 +102,7 @@ class GameWindow(QMainWindow):
                 self.update_board(state)
                 self.update_status(state)
                 self.update_bar(state)
+                self.update_bear_off(state)
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
@@ -206,6 +211,18 @@ class GameWindow(QMainWindow):
         else:
             self.barLabel.setText(f"BAR\nBeyaz: {white_bar}\nSiyah: {black_bar}")
             self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkred; border: 2px solid darkred; padding: 5px;")
+
+    def update_bear_off(self, state):
+        bear_off = state.get("bear_off", {})
+        black_off = bear_off.get("black", 0)
+        white_off = bear_off.get("white", 0)
+
+        if black_off == 0 and white_off == 0:
+            self.bearOffLabel.setText("Henüz çıkan taş yok")
+            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        else:
+            self.bearOffLabel.setText(f"Çıkan Taşlar\nBeyaz: {white_off}\nSiyah: {black_off}")
+            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkgreen; border: 2px solid darkgreen; padding: 5px;")
 
     def on_point_clicked(self, index):
         if self.bar_active:
