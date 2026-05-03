@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox, QLabel
+from PySide6.QtCore import Qt
 from game_ui import Ui_Oyun_Tahtasi
 import sys
 from client.client import GameClient
@@ -20,12 +21,9 @@ class GameWindow(QMainWindow):
 
         self.init_board()
 
-        self.validMovesLabel = QLabel("Geçerli hamleler bekleniyor...")
-        self.validMovesLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
-        self.ui.horizontalLayout_2.addWidget(self.validMovesLabel)
-
         self.statusLabel = QLabel("Oyun bekleniyor...")
-        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: darkred;")
+        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: #333; padding: 5px;")
+        self.statusLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.ui.horizontalLayout_2.addWidget(self.statusLabel)
 
         self.barLabel = QLabel("BAR\nBoş")
@@ -59,7 +57,7 @@ class GameWindow(QMainWindow):
         msg_type = msg.get("type")
 
         if msg_type == "WAITING":
-            self.ui.player_status.setText("Rakip bekleniyor...")
+            self.statusLabel.setText("Rakip bekleniyor...")
 
         elif msg_type == "MATCH":
             color = msg.get("color")
@@ -152,12 +150,6 @@ class GameWindow(QMainWindow):
         self.valid_starts = set(m[0] for m in valid_moves)
         self.selected_start = None
         self.bar_active = -1 in self.valid_starts
-        
-        if valid_moves:
-            moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
-            self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
-        else:
-            self.validMovesLabel.setText("Geçerli hamle yok")
 
     def update_board(self, state):
         points = state.get("points", [])
