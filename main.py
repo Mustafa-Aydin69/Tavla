@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox, QLabel
+from PySide6.QtCore import Qt
 from game_ui import Ui_Oyun_Tahtasi
 import sys
 from client.client import GameClient
@@ -20,13 +21,18 @@ class GameWindow(QMainWindow):
 
         self.init_board()
 
-        self.validMovesLabel = QLabel("Geçerli hamleler bekleniyor...")
-        self.validMovesLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
-        self.ui.horizontalLayout_2.addWidget(self.validMovesLabel)
-
         self.statusLabel = QLabel("Oyun bekleniyor...")
-        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: darkred;")
+        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: #333; padding: 5px;")
+        self.statusLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.ui.horizontalLayout_2.addWidget(self.statusLabel)
+
+        self.barLabel = QLabel("BAR\nBoş")
+        self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.ui.horizontalLayout_2.addWidget(self.barLabel)
+
+        self.bearOffLabel = QLabel("Henüz çıkan taş yok")
+        self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.ui.horizontalLayout_2.addWidget(self.bearOffLabel)
 
         self.valid_starts = set()
         self.selected_start = None
@@ -51,7 +57,7 @@ class GameWindow(QMainWindow):
         msg_type = msg.get("type")
 
         if msg_type == "WAITING":
-            self.ui.player_status.setText("Rakip bekleniyor...")
+            self.statusLabel.setText("Rakip bekleniyor...")
 
         elif msg_type == "MATCH":
             color = msg.get("color")
@@ -93,6 +99,8 @@ class GameWindow(QMainWindow):
                 self.update_valid_moves(state)
                 self.update_board(state)
                 self.update_status(state)
+                self.update_bar(state)
+                self.update_bear_off(state)
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
@@ -142,12 +150,6 @@ class GameWindow(QMainWindow):
         self.valid_starts = set(m[0] for m in valid_moves)
         self.selected_start = None
         self.bar_active = -1 in self.valid_starts
-        
-        if valid_moves:
-            moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
-            self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
-        else:
-            self.validMovesLabel.setText("Geçerli hamle yok")
 
     def update_board(self, state):
         points = state.get("points", [])
@@ -189,6 +191,30 @@ class GameWindow(QMainWindow):
             self.statusLabel.setText("Önce kırılan taşı gir")
         else:
             self.statusLabel.setText("Hamle yap")
+
+    def update_bar(self, state):
+        bar = state.get("bar", {})
+        black_bar = bar.get("black", 0)
+        white_bar = bar.get("white", 0)
+
+        if black_bar == 0 and white_bar == 0:
+            self.barLabel.setText("BAR\nBoş")
+            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        else:
+            self.barLabel.setText(f"BAR\nBeyaz: {white_bar}\nSiyah: {black_bar}")
+            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkred; border: 2px solid darkred; padding: 5px;")
+
+    def update_bear_off(self, state):
+        bear_off = state.get("bear_off", {})
+        black_off = bear_off.get("black", 0)
+        white_off = bear_off.get("white", 0)
+
+        if black_off == 0 and white_off == 0:
+            self.bearOffLabel.setText("Henüz çıkan taş yok")
+            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        else:
+            self.bearOffLabel.setText(f"Çıkan Taşlar\nBeyaz: {white_off}\nSiyah: {black_off}")
+            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkgreen; border: 2px solid darkgreen; padding: 5px;")
 
     def on_point_clicked(self, index):
         if self.bar_active:
