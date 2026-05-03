@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox
 from game_ui import Ui_Oyun_Tahtasi
 import sys
 from client.client import GameClient
@@ -44,6 +44,23 @@ class GameWindow(QMainWindow):
                 display_color = color
 
             self.ui.player_status.setText(f"Renginiz: {display_color}")
+
+        elif msg_type == "OPPONENT_DISCONNECTED":
+            reply = QMessageBox.question(
+                self, 
+                "Oyun Bitti", 
+                "Rakip oyundan ayrıldı. Kazandınız!\nTekrar oynamak ister misiniz?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.client.stop()
+                self.client = GameClient()
+                self.client.on_message = lambda m: self.bridge.message.emit(m)
+                self.client.start()
+            else:
+                self.client.stop()
+                QApplication.quit()
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)
