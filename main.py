@@ -26,7 +26,13 @@ class GameWindow(QMainWindow):
         self.client.on_message = lambda msg: self.bridge.message.emit(msg)
         self.bridge.message.connect(self.handle_server_message)
 
+        self.ui.dice_Button.clicked.connect(self.request_roll)
+
         self.client.start()
+
+    def request_roll(self):
+        if self.client:
+            self.client.send({"type": "ROLL"})
 
     def handle_server_message(self, msg):
         msg_type = msg.get("type")
@@ -71,7 +77,7 @@ class GameWindow(QMainWindow):
                 current_player = state.get("current_player")
 
                 # Buton kontrolü
-                if current_player and self.my_color and current_player == self.my_color:
+                if current_player and self.my_color and current_player == self.my_color and len(dice) == 0:
                     self.ui.dice_Button.setEnabled(True)
                 else:
                     self.ui.dice_Button.setEnabled(False)

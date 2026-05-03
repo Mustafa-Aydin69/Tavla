@@ -91,7 +91,38 @@ def handle_client(client: ClientContext):
                         msg = decode(line)
                         logger.debug(f"Received from {client.addr}: {msg.get('type')}")
 
-                        if msg.get("type") == "MOVE":
+                        if msg.get("type") == "ROLL":
+                            session = client.game
+                            if not session:
+                                continue
+
+                            with session.lock:
+                                if session.game.current_player != client.color:
+                                    send_safe(client.conn, {"type": "REJECT", "reason": "Not your turn"})
+                                    continue
+
+                                if session.game.moves_left:
+                                    send_safe(client.conn, {"type": "REJECT", "reason": "Dice already rolled"})
+                                    continue
+
+                                success = session.game.roll_dice()
+                                if not success:
+                                    send_safe(client.conn, {"type": "REJECT", "reason": "Could not roll dice"})
+                                    continue
+
+                                state = session.game.get_state()
+                                turn_color = session.game.current_player
+                                last_player = "black" if turn_color == "white" else "white"
+
+                                for p in session.players:
+                                    send_safe(p.conn, {
+                                        "type": "STATE",
+                                        "state": state,
+                                        "turn": turn_color,
+                                        "last_player": last_player,
+                                    })
+
+                        elif msg.get("type") == "MOVE":
                             session = client.game
                             if not session:
                                 continue
