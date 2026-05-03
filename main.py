@@ -28,6 +28,10 @@ class GameWindow(QMainWindow):
         self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: darkred;")
         self.ui.horizontalLayout_2.addWidget(self.statusLabel)
 
+        self.barLabel = QLabel("BAR\nBoş")
+        self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.ui.horizontalLayout_2.addWidget(self.barLabel)
+
         self.valid_starts = set()
         self.selected_start = None
         self.valid_moves = []
@@ -93,6 +97,7 @@ class GameWindow(QMainWindow):
                 self.update_valid_moves(state)
                 self.update_board(state)
                 self.update_status(state)
+                self.update_bar(state)
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
@@ -189,6 +194,18 @@ class GameWindow(QMainWindow):
             self.statusLabel.setText("Önce kırılan taşı gir")
         else:
             self.statusLabel.setText("Hamle yap")
+
+    def update_bar(self, state):
+        bar = state.get("bar", {})
+        black_bar = bar.get("black", 0)
+        white_bar = bar.get("white", 0)
+
+        if black_bar == 0 and white_bar == 0:
+            self.barLabel.setText("BAR\nBoş")
+            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        else:
+            self.barLabel.setText(f"BAR\nBeyaz: {white_bar}\nSiyah: {black_bar}")
+            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkred; border: 2px solid darkred; padding: 5px;")
 
     def on_point_clicked(self, index):
         if self.bar_active:
