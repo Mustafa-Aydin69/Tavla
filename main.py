@@ -81,51 +81,82 @@ class GameWindow(QMainWindow):
         elif msg_type == "STATE":
             state = msg.get("state")
             if state is not None:
-                dice = state.get("moves_left", [])
-                current_player = state.get("current_player")
-
-                # Buton kontrolü
-                if current_player and self.my_color and current_player == self.my_color and len(dice) == 0:
-                    self.ui.dice_Button.setEnabled(True)
-                else:
-                    self.ui.dice_Button.setEnabled(False)
-
-                # Zar metinlerini güncelle
-                if len(dice) == 0:
-                    self.ui.Zar_lcdNumber_lcdNumber_2.setText("-")
-                    self.ui.dice_lcdNumber.setText("-")
-                elif len(dice) == 1:
-                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
-                    self.ui.dice_lcdNumber.setText("")
-                elif len(dice) == 2:
-                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
-                    self.ui.dice_lcdNumber.setText(str(dice[1]))
-                elif len(dice) >= 3:
-                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(f"{dice[0]} (x{len(dice)})")
-                    self.ui.dice_lcdNumber.setText("")
-
-                # Geçerli hamleleri göster
-                valid_moves = state.get("valid_moves", [])
-                self.valid_moves = valid_moves
-                
-                self.valid_starts = set(m[0] for m in valid_moves)
-                self.selected_start = None
-                
-                if valid_moves:
-                    moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
-                    self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
-                else:
-                    self.validMovesLabel.setText("Geçerli hamle yok")
-
-                # Butonları valid_starts'a göre renklendir
-                for i in range(24):
-                    if i in self.valid_starts:
-                        self.points[i].setStyleSheet("background-color: yellow; color: black; font-weight: bold;")
-                    else:
-                        self.points[i].setStyleSheet("")
+                print("STATE:", state)
+                self.update_turn(state)
+                self.update_dice(state)
+                self.update_valid_moves(state)
+                self.update_board(state)
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
-        print("UI aldı:", msg)
+        # print("UI aldı:", msg)
+
+    def update_turn(self, state):
+        current_player = state.get("current_player")
+        if current_player:
+            text = "Beyaz" if current_player == "white" else "Siyah"
+            self.ui.Turn_Status.setText(text)
+
+    def update_dice(self, state):
+        dice = state.get("moves_left", [])
+        current_player = state.get("current_player")
+
+        # Buton kontrolü
+        if current_player and self.my_color and current_player == self.my_color and len(dice) == 0:
+            self.ui.dice_Button.setEnabled(True)
+        else:
+            self.ui.dice_Button.setEnabled(False)
+
+        # Zar metinlerini güncelle
+        if len(dice) == 0:
+            self.ui.Zar_lcdNumber_lcdNumber_2.setText("-")
+            self.ui.dice_lcdNumber.setText("-")
+        elif len(dice) == 1:
+            self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
+            self.ui.dice_lcdNumber.setText("")
+        elif len(dice) == 2:
+            self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
+            self.ui.dice_lcdNumber.setText(str(dice[1]))
+        elif len(dice) >= 3:
+            self.ui.Zar_lcdNumber_lcdNumber_2.setText(f"{dice[0]} (x{len(dice)})")
+            self.ui.dice_lcdNumber.setText("")
+
+    def update_valid_moves(self, state):
+        valid_moves = state.get("valid_moves", [])
+        self.valid_moves = valid_moves
+        
+        self.valid_starts = set(m[0] for m in valid_moves)
+        self.selected_start = None
+        
+        if valid_moves:
+            moves_str = "\n".join([f"{m[0]} → {m[1]}" for m in valid_moves])
+            self.validMovesLabel.setText(f"Geçerli hamleler:\n{moves_str}")
+        else:
+            self.validMovesLabel.setText("Geçerli hamle yok")
+
+    def update_board(self, state):
+        points = state.get("points", [])
+        for i in range(24):
+            btn = self.points[i]
+            bg_color = "yellow" if i in self.valid_starts else "transparent"
+            
+            if i < len(points):
+                owner = points[i].get("owner")
+                count = points[i].get("count")
+                
+                if count > 0:
+                    owner_tr = "Byz" if owner == "white" else "Syh"
+                    # Taşı göster
+                    btn.setText(f"{i}\n{owner_tr}\n({count})")
+                    if owner == "white":
+                        btn.setStyleSheet(f"background-color: {bg_color}; color: #555; border: 2px solid white; font-weight: bold;")
+                    else:
+                        btn.setStyleSheet(f"background-color: {bg_color}; color: black; border: 2px solid black; font-weight: bold;")
+                else:
+                    btn.setText(str(i))
+                    btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
+            else:
+                btn.setText(str(i))
+                btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
 
     def on_point_clicked(self, index):
         if self.selected_start is not None:
