@@ -26,6 +26,7 @@ class GameWindow(QMainWindow):
 
         self.valid_starts = set()
         self.selected_start = None
+        self.valid_moves = []
 
         self.client = GameClient()
         self.bridge = SignalBridge()
@@ -105,6 +106,7 @@ class GameWindow(QMainWindow):
 
                 # Geçerli hamleleri göster
                 valid_moves = state.get("valid_moves", [])
+                self.valid_moves = valid_moves
                 
                 self.valid_starts = set(m[0] for m in valid_moves)
                 self.selected_start = None
@@ -131,16 +133,23 @@ class GameWindow(QMainWindow):
 
         self.selected_start = index
 
-        # Tüm geçerli olanları sarıya geri döndür
+        # Bu taş için gidebileceği hedefleri bul
+        targets = [move[1] for move in self.valid_moves if move[0] == index]
+
+        # Buton renklerini güncelle
         for i in range(24):
-            if i in self.valid_starts:
+            if i == index:
+                # Seçilen taş
+                self.points[i].setStyleSheet("background-color: lightgreen; color: black; font-weight: bold;")
+            elif i in targets:
+                # Gidebileceği hedefler
+                self.points[i].setStyleSheet("background-color: lightblue; color: black; font-weight: bold;")
+            elif i in self.valid_starts:
+                # Diğer oynanabilir taşlar
                 self.points[i].setStyleSheet("background-color: yellow; color: black; font-weight: bold;")
             else:
+                # Diğer boş veya oynanamaz taşlar
                 self.points[i].setStyleSheet("")
-
-        # Seçilen butonu yeşil yap
-        if 0 <= index <= 23:
-            self.points[index].setStyleSheet("background-color: lightgreen; color: black; font-weight: bold;")
 
     def init_board(self):
         from PySide6.QtWidgets import QPushButton, QGridLayout
