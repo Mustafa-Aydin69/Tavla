@@ -11,6 +11,7 @@ class GameWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.my_color = None
         self.ui = Ui_Oyun_Tahtasi()
         self.ui.setupUi(self)
 
@@ -35,6 +36,7 @@ class GameWindow(QMainWindow):
 
         elif msg_type == "MATCH":
             color = msg.get("color")
+            self.my_color = color
             # Türkçeleştirme
             if color == "white":
                 display_color = "Beyaz"
@@ -61,6 +63,32 @@ class GameWindow(QMainWindow):
             else:
                 self.client.stop()
                 QApplication.quit()
+
+        elif msg_type == "STATE":
+            state = msg.get("state")
+            if state is not None:
+                dice = state.get("moves_left", [])
+                current_player = state.get("current_player")
+
+                # Buton kontrolü
+                if current_player and self.my_color and current_player == self.my_color:
+                    self.ui.dice_Button.setEnabled(True)
+                else:
+                    self.ui.dice_Button.setEnabled(False)
+
+                # Zar metinlerini güncelle
+                if len(dice) == 0:
+                    self.ui.Zar_lcdNumber_lcdNumber_2.setText("-")
+                    self.ui.dice_lcdNumber.setText("-")
+                elif len(dice) == 1:
+                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
+                    self.ui.dice_lcdNumber.setText("")
+                elif len(dice) == 2:
+                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
+                    self.ui.dice_lcdNumber.setText(str(dice[1]))
+                elif len(dice) >= 3:
+                    self.ui.Zar_lcdNumber_lcdNumber_2.setText(str(dice[0]))
+                    self.ui.dice_lcdNumber.setText(f"{dice[0]} (x{len(dice)})")
 
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         print("UI aldı:", msg)

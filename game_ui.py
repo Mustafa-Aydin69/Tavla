@@ -336,12 +336,12 @@ class Ui_Oyun_Tahtasi(object):
         self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.Zar_lcdNumber_lcdNumber_2 = QtWidgets.QLCDNumber(
-            parent=self.horizontalLayoutWidget
-        )
+        self.Zar_lcdNumber_lcdNumber_2 = QtWidgets.QLabel(parent=self.horizontalLayoutWidget)
+        self.Zar_lcdNumber_lcdNumber_2.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.Zar_lcdNumber_lcdNumber_2.setObjectName("Zar_lcdNumber_lcdNumber_2")
         self.horizontalLayout.addWidget(self.Zar_lcdNumber_lcdNumber_2)
-        self.dice_lcdNumber = QtWidgets.QLCDNumber(parent=self.horizontalLayoutWidget)
+        self.dice_lcdNumber = QtWidgets.QLabel(parent=self.horizontalLayoutWidget)
+        self.dice_lcdNumber.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.dice_lcdNumber.setObjectName("dice_lcdNumber")
         self.horizontalLayout.addWidget(self.dice_lcdNumber)
         self.dice_Button = QtWidgets.QPushButton(parent=self.horizontalLayoutWidget)
