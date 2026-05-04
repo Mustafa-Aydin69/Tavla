@@ -108,6 +108,26 @@ class GameWindow(QMainWindow):
                 self.update_bar(state)
                 self.update_bear_off(state)
 
+        elif msg_type == "GAME_OVER":
+            winner = msg.get("winner")
+            if winner == self.my_color:
+                text = "Kazandınız!"
+            else:
+                text = "Kaybettiniz!"
+
+            reply = QMessageBox.question(
+                self,
+                "Oyun Bitti",
+                f"{text}\nTekrar oynamak ister misiniz?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                if self.client:
+                    self.client.send({"type": "REQUEUE"})
+            else:
+                self.close()
+
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
 
