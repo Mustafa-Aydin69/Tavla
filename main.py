@@ -22,16 +22,22 @@ class GameWindow(QMainWindow):
         self.init_board()
 
         self.statusLabel = QLabel("Oyun bekleniyor...")
-        self.statusLabel.setStyleSheet("font-size: 16px; font-weight: bold; color: #333; padding: 5px;")
+        self.statusLabel.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #333; padding: 5px;"
+        )
         self.statusLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.ui.horizontalLayout_2.addWidget(self.statusLabel)
 
         self.barLabel = QLabel("BAR\nBoş")
-        self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.barLabel.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;"
+        )
         self.ui.horizontalLayout_2.addWidget(self.barLabel)
 
         self.bearOffLabel = QLabel("Henüz çıkan taş yok")
-        self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+        self.bearOffLabel.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;"
+        )
         self.ui.horizontalLayout_2.addWidget(self.bearOffLabel)
 
         self.valid_starts = set()
@@ -74,12 +80,12 @@ class GameWindow(QMainWindow):
 
         elif msg_type == "OPPONENT_DISCONNECTED":
             reply = QMessageBox.question(
-                self, 
-                "Oyun Bitti", 
+                self,
+                "Oyun Bitti",
                 "Rakip oyundan ayrıldı. Kazandınız!\nTekrar oynamak ister misiniz?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 self.client.stop()
                 self.client = GameClient()
@@ -102,13 +108,33 @@ class GameWindow(QMainWindow):
                 self.update_bar(state)
                 self.update_bear_off(state)
 
+        elif msg_type == "GAME_OVER":
+            winner = msg.get("winner")
+            if winner == self.my_color:
+                text = "Kazandınız!"
+            else:
+                text = "Kaybettiniz!"
+
+            reply = QMessageBox.question(
+                self,
+                "Oyun Bitti",
+                f"{text}\nTekrar oynamak ister misiniz?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                if self.client:
+                    self.client.send({"type": "REQUEUE"})
+            else:
+                self.close()
+
         # Gelen diğer mesajları takip edebilmek için debug logu bırakıyoruz
         # print("UI aldı:", msg)
 
     def reset_ui(self):
         self.selected_start = None
         self.bar_active = False
-        
+
         for i in range(24):
             if i < len(self.points):
                 self.points[i].setStyleSheet("")
@@ -124,7 +150,12 @@ class GameWindow(QMainWindow):
         current_player = state.get("current_player")
 
         # Buton kontrolü
-        if current_player and self.my_color and current_player == self.my_color and len(dice) == 0:
+        if (
+            current_player
+            and self.my_color
+            and current_player == self.my_color
+            and len(dice) == 0
+        ):
             self.ui.dice_Button.setEnabled(True)
         else:
             self.ui.dice_Button.setEnabled(False)
@@ -146,35 +177,53 @@ class GameWindow(QMainWindow):
     def update_valid_moves(self, state):
         valid_moves = state.get("valid_moves", [])
         self.valid_moves = valid_moves
-        
+
         self.valid_starts = set(m[0] for m in valid_moves)
         self.selected_start = None
         self.bar_active = -1 in self.valid_starts
 
     def update_board(self, state):
         points = state.get("points", [])
+        
+        bar_targets = []
+        if self.bar_active:
+            bar_moves = [move for move in self.valid_moves if move[0] == -1]
+            bar_targets = [move[1] for move in bar_moves]
+
         for i in range(24):
             btn = self.points[i]
-            bg_color = "yellow" if i in self.valid_starts else "transparent"
             
+            if self.bar_active:
+                bg_color = "yellow" if i in bar_targets else "transparent"
+            else:
+                bg_color = "yellow" if i in self.valid_starts else "transparent"
+
             if i < len(points):
                 owner = points[i].get("owner")
                 count = points[i].get("count")
-                
+
                 if count > 0:
                     owner_tr = "Byz" if owner == "white" else "Syh"
                     # Taşı göster
                     btn.setText(f"{i}\n{owner_tr}\n({count})")
                     if owner == "white":
-                        btn.setStyleSheet(f"background-color: {bg_color}; color: #555; border: 2px solid white; font-weight: bold;")
+                        btn.setStyleSheet(
+                            f"background-color: {bg_color}; color: #555; border: 2px solid white; font-weight: bold;"
+                        )
                     else:
-                        btn.setStyleSheet(f"background-color: {bg_color}; color: black; border: 2px solid black; font-weight: bold;")
+                        btn.setStyleSheet(
+                            f"background-color: {bg_color}; color: black; border: 2px solid black; font-weight: bold;"
+                        )
                 else:
                     btn.setText(str(i))
-                    btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
+                    btn.setStyleSheet(
+                        f"background-color: {bg_color}; color: black; font-weight: bold;"
+                    )
             else:
                 btn.setText(str(i))
-                btn.setStyleSheet(f"background-color: {bg_color}; color: black; font-weight: bold;")
+                btn.setStyleSheet(
+                    f"background-color: {bg_color}; color: black; font-weight: bold;"
+                )
 
     def update_status(self, state):
         current_player = state.get("current_player")
@@ -199,10 +248,14 @@ class GameWindow(QMainWindow):
 
         if black_bar == 0 and white_bar == 0:
             self.barLabel.setText("BAR\nBoş")
-            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+            self.barLabel.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;"
+            )
         else:
             self.barLabel.setText(f"BAR\nBeyaz: {white_bar}\nSiyah: {black_bar}")
-            self.barLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkred; border: 2px solid darkred; padding: 5px;")
+            self.barLabel.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: darkred; border: 2px solid darkred; padding: 5px;"
+            )
 
     def update_bear_off(self, state):
         bear_off = state.get("bear_off", {})
@@ -211,10 +264,16 @@ class GameWindow(QMainWindow):
 
         if black_off == 0 and white_off == 0:
             self.bearOffLabel.setText("Henüz çıkan taş yok")
-            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;")
+            self.bearOffLabel.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #555; border: 2px dashed #999; padding: 5px;"
+            )
         else:
-            self.bearOffLabel.setText(f"Çıkan Taşlar\nBeyaz: {white_off}\nSiyah: {black_off}")
-            self.bearOffLabel.setStyleSheet("font-size: 14px; font-weight: bold; color: darkgreen; border: 2px solid darkgreen; padding: 5px;")
+            self.bearOffLabel.setText(
+                f"Çıkan Taşlar\nBeyaz: {white_off}\nSiyah: {black_off}"
+            )
+            self.bearOffLabel.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: darkgreen; border: 2px solid darkgreen; padding: 5px;"
+            )
 
     def on_point_clicked(self, index):
         if self.bar_active:
@@ -223,15 +282,12 @@ class GameWindow(QMainWindow):
                 if move[0] == -1 and move[1] == index:
                     selected_move = move
                     break
-            
+
             if selected_move:
                 die = selected_move[2]
                 if self.client:
-                    self.client.send({
-                        "type": "MOVE",
-                        "moves": [(-1, die)]
-                    })
-                
+                    self.client.send({"type": "MOVE", "moves": [(-1, die)]})
+
                 self.bar_active = False
                 for i in range(24):
                     self.points[i].setStyleSheet("")
@@ -247,22 +303,21 @@ class GameWindow(QMainWindow):
                 if move[0] == self.selected_start and move[1] == index:
                     selected_move = move
                     break
-            
+
             if selected_move:
                 # Doğru hedef, hamleyi gönder
                 die = selected_move[2]
                 if self.client:
-                    self.client.send({
-                        "type": "MOVE",
-                        "moves": [(self.selected_start, die)]
-                    })
-                
+                    self.client.send(
+                        {"type": "MOVE", "moves": [(self.selected_start, die)]}
+                    )
+
                 self.selected_start = None
                 # Gönderdikten sonra highlight'ları temizle
                 for i in range(24):
                     self.points[i].setStyleSheet("")
                 return
-            
+
             # Eğer hedefe tıklamadıysa, belki başka bir başlangıç taşı seçmiştir
             if index in self.valid_starts:
                 self.selected_start = index
@@ -277,19 +332,27 @@ class GameWindow(QMainWindow):
             self.selected_start = index
 
         # Bu taş için gidebileceği hedefleri bul
-        targets = [move[1] for move in self.valid_moves if move[0] == self.selected_start]
+        targets = [
+            move[1] for move in self.valid_moves if move[0] == self.selected_start
+        ]
 
         # Buton renklerini güncelle
         for i in range(24):
             if i == self.selected_start:
                 # Seçilen taş
-                self.points[i].setStyleSheet("background-color: lightgreen; color: black; font-weight: bold;")
+                self.points[i].setStyleSheet(
+                    "background-color: lightgreen; color: black; font-weight: bold;"
+                )
             elif i in targets:
                 # Gidebileceği hedefler
-                self.points[i].setStyleSheet("background-color: lightblue; color: black; font-weight: bold;")
+                self.points[i].setStyleSheet(
+                    "background-color: lightblue; color: black; font-weight: bold;"
+                )
             elif i in self.valid_starts:
                 # Diğer oynanabilir taşlar
-                self.points[i].setStyleSheet("background-color: yellow; color: black; font-weight: bold;")
+                self.points[i].setStyleSheet(
+                    "background-color: yellow; color: black; font-weight: bold;"
+                )
             else:
                 # Diğer boş veya oynanamaz taşlar
                 self.points[i].setStyleSheet("")
