@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.protocol import encode, decode
 
-HOST = "127.0.0.1"
+HOST = "44.203.35.107"
 PORT = 5000
 
 ROLL = "ROLL"
