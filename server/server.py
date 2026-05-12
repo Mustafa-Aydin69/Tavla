@@ -270,7 +270,7 @@ def start_server():
             # Bağlantı bekle ve kabul et
             client_socket, client_address = server_socket.accept()
 
-            print(f"New connection: {client_address}")
+            logger.info(f"[CONNECTED] {client_address}")
 
             # Bağlantıya 5 dakikalık (300 saniye) eylemsizlik (AFK) sınırı koy
             client_socket.settimeout(300.0)
@@ -286,6 +286,7 @@ def start_server():
             with waiting_lock:
                 waiting_players.append(client)
                 send_safe(client.conn, {"type": "WAITING"})
+                logger.info(f"[WAITING] {client_address} rakip bekliyor (kuyruk: {len(waiting_players)} kişi)")
 
                 # 2 oyuncu olunca eşleştir
                 if len(waiting_players) >= 2:
